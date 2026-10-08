@@ -44,10 +44,8 @@ npm install
 ```
 
 ### 2. Environment Setup
-Create a `.env` file in the project root:
-```env
-VITE_TMDB_API_KEY="4885ba83e8fcc37c495a2e71ece8366d"
-```
+Create a `.env` file in the project root.
+
 
 ### 3. Run Development Server
 ```bash
