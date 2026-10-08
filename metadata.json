@@ -1,0 +1,6 @@
+{
+  "name": "Aether Cinema — iOS 27 Spatial Streaming",
+  "description": "Futuristic movie and TV show spatial discovery with iOS 27 Liquid Glass design, instant streaming playback, TMDB catalog, and Spotlight search.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
