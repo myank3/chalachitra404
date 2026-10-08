@@ -27,12 +27,6 @@ export const PROVIDERS: Provider[] = [
     tv: (id, s, e) => `https://vidsrc.pm/embed/tv/${id}/${s}/${e}`,
   },
   {
-    id: '2embed',
-    name: '2Embed',
-    movie: (id) => `https://2embed.skin/movie/${id}`,
-    tv: (id, s, e) => `https://2embed.skin/tv/${id}/${s}/${e}`,
-  },
-  {
     id: 'autoembed',
     name: 'AutoEmbed',
     movie: (id) => `https://autoembed.co/movie/${id}`,
