@@ -55,8 +55,7 @@ async function fetchTMDB<T>(
 }
 
 /* ------------------------------------------------------------------
-   GENRES — real TMDB endpoints. These are the only IDs that
-   /discover/movie and /discover/tv actually understand.
+   GENRES
    ------------------------------------------------------------------ */
 export async function getMovieGenres(signal?: AbortSignal): Promise<Genre[]> {
   const data = await fetchTMDB<{ genres: Genre[] }>('/genre/movie/list', {}, signal);
@@ -133,7 +132,62 @@ export async function getTopRatedTV(signal?: AbortSignal): Promise<MediaItem[]> 
 }
 
 /* ------------------------------------------------------------------
-   DISCOVER — genre-driven, uses real TMDB genre IDs
+   INDIAN MOVIES
+   Hindi · Tamil · Telugu · Malayalam · Kannada · Bengali · Marathi · Punjabi
+   ------------------------------------------------------------------ */
+export const INDIAN_LANGUAGES = ['hi', 'ta', 'te', 'ml', 'kn', 'bn', 'mr', 'pa'] as const;
+
+export interface IndianMoviesOptions {
+  languages?: readonly string[];
+  minVotes?: number;
+  sortBy?: 'popularity.desc' | 'vote_average.desc' | 'revenue.desc' | 'primary_release_date.desc';
+  page?: number;
+}
+
+export async function getIndianMovies(
+  options: IndianMoviesOptions = {},
+  signal?: AbortSignal
+): Promise<MediaItem[]> {
+  const {
+    languages = INDIAN_LANGUAGES,
+    minVotes = 50,
+    sortBy = 'popularity.desc',
+    page = 1,
+  } = options;
+
+  try {
+    const data = await fetchTMDB<{ results: MediaItem[] }>(
+      '/discover/movie',
+      {
+        with_original_language: languages.join('|'),
+        sort_by: sortBy,
+        'vote_count.gte': minVotes,
+        include_adult: false,
+        page,
+      },
+      signal
+    );
+    return data.results.map((item) => ({
+      ...item,
+      media_type: 'movie' as const,
+      title: item.title || 'Untitled',
+    }));
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') throw error;
+    console.warn('Indian movies fetch failed:', error);
+    return [];
+  }
+}
+
+export async function getTopRatedIndianMovies(signal?: AbortSignal): Promise<MediaItem[]> {
+  return getIndianMovies(
+    { minVotes: 500, sortBy: 'vote_average.desc' },
+    signal
+  );
+}
+
+/* ------------------------------------------------------------------
+   DISCOVER
    ------------------------------------------------------------------ */
 export async function getDiscoverMovies(
   params: {
@@ -311,6 +365,28 @@ export function useTopRatedTV() {
     queryKey: ['top-rated-tv'],
     queryFn: ({ signal }) => getTopRatedTV(signal),
     staleTime: 1000 * 60 * 10,
+  });
+}
+
+export function useIndianMovies(options: IndianMoviesOptions = {}) {
+  return useQuery({
+    queryKey: [
+      'indian-movies',
+      options.languages?.join('|') ?? INDIAN_LANGUAGES.join('|'),
+      options.minVotes ?? 50,
+      options.sortBy ?? 'popularity.desc',
+      options.page ?? 1,
+    ],
+    queryFn: ({ signal }) => getIndianMovies(options, signal),
+    staleTime: 1000 * 60 * 30,
+  });
+}
+
+export function useTopRatedIndianMovies() {
+  return useQuery({
+    queryKey: ['indian-movies-top-rated'],
+    queryFn: ({ signal }) => getTopRatedIndianMovies(signal),
+    staleTime: 1000 * 60 * 60,
   });
 }
 

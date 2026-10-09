@@ -1,11 +1,20 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Play, Info, ChevronRight, Sparkles, TrendingUp } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import {
+  Play,
+  Info,
+  ChevronRight,
+  Sparkles,
+  TrendingUp,
+  Flame,
+} from 'lucide-react';
 import {
   useTrending,
   usePopularMovies,
   useTopRatedTV,
+  useIndianMovies,
   getImageUrl,
   getDetails,
 } from '../lib/api';
@@ -13,7 +22,7 @@ import { MOCK_GENRES } from '../data/mockData';
 import { MovieCard } from '../components/MovieCard';
 
 /* ────────────────────────────────────────────────
-   History types
+   History
    ──────────────────────────────────────────────── */
 interface HistoryItem {
   id: number | string;
@@ -48,25 +57,67 @@ function readHistoryFromStorage(): HistoryItem[] {
 }
 
 /* ────────────────────────────────────────────────
+   Container
+   ──────────────────────────────────────────────── */
+const CONTAINER = 'max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8';
+
+/* ⭐ Hero timings — poster + content must finish together */
+const SLIDE_INTERVAL_MS = 6000;
+const SLIDE_FADE_MS = 1200;
+const CONTENT_EXIT_MS = 400;
+const CONTENT_ENTER_MS = 700;
+
+/* ────────────────────────────────────────────────
    Hero
    ──────────────────────────────────────────────── */
 const Hero: React.FC<{ items: any[] }> = ({ items }) => {
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
+  const [phase, setPhase] = useState<'idle' | 'exiting' | 'entering'>('idle');
   const timerRef = useRef<number | null>(null);
+  const phaseTimerRef = useRef<number | null>(null);
 
   const featured = items.slice(0, 5);
+
+  const advance = (nextIndex: number) => {
+    if (phase !== 'idle') return;
+
+    setPhase('exiting');
+
+    phaseTimerRef.current = window.setTimeout(() => {
+      setIndex(nextIndex);
+      setPhase('entering');
+
+      phaseTimerRef.current = window.setTimeout(() => {
+        setPhase('idle');
+      }, CONTENT_ENTER_MS);
+    }, CONTENT_EXIT_MS);
+  };
 
   useEffect(() => {
     if (featured.length < 2) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
     timerRef.current = window.setInterval(() => {
-      setIndex((i) => (i + 1) % featured.length);
-    }, 8000);
+      setIndex((current) => {
+        const next = (current + 1) % featured.length;
+        advance(next);
+        return current;
+      });
+    }, SLIDE_INTERVAL_MS);
+
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
+      if (phaseTimerRef.current) window.clearTimeout(phaseTimerRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featured.length]);
+
+  const goToSlide = (i: number) => {
+    if (i === index || phase !== 'idle') return;
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    advance(i);
+  };
 
   if (featured.length === 0) {
     return <div className="h-[70vh] bg-[#0a0a0b]" />;
@@ -76,7 +127,6 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
   const title = current.title || current.name || 'Untitled';
   const year = (current.release_date || current.first_air_date || '').slice(0, 4);
   const type = current.media_type || 'movie';
-  const backdrop = getImageUrl(current.backdrop_path, 'original');
   const rating = current.vote_average?.toFixed(1);
 
   const goToDetails = () =>
@@ -84,145 +134,199 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
 
   return (
     <section className="relative w-full h-[78vh] min-h-[560px]">
-      {backdrop && (
-        <div
-          key={current.id}
-          className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
-          style={{
-            backgroundImage: `url(${backdrop})`,
-            animation: 'kenburns 20s ease-in-out infinite alternate',
-          }}
-        />
-      )}
+      {/* ── BACKDROPS — stacked, crossfade ── */}
+      <div className="absolute inset-0 overflow-hidden">
+        {featured.map((item, i) => {
+          const bg = getImageUrl(item.backdrop_path, 'original');
+          if (!bg) return null;
+          const isActive = i === index;
+          return (
+            <div
+              key={item.id}
+              className="absolute inset-0 bg-cover bg-center"
+              style={{
+                backgroundImage: `url(${bg})`,
+                opacity: isActive ? 1 : 0,
+                transition: `opacity ${SLIDE_FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                animation: isActive
+                  ? `heroKenBurns ${SLIDE_INTERVAL_MS + SLIDE_FADE_MS}ms ease-out forwards`
+                  : 'none',
+                willChange: 'opacity, transform',
+                backfaceVisibility: 'hidden',
+              }}
+            />
+          );
+        })}
+      </div>
 
+      {/* ── Gradients ── */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 pointer-events-none"
         style={{
           background:
             'linear-gradient(180deg, rgba(10,10,11,0.55) 0%, rgba(10,10,11,0.15) 30%, rgba(10,10,11,0.85) 75%, #0a0a0b 100%)',
         }}
       />
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 pointer-events-none"
         style={{
           background:
             'linear-gradient(90deg, rgba(10,10,11,0.9) 0%, rgba(10,10,11,0.4) 40%, transparent 70%)',
         }}
       />
 
-      <div className="relative h-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 flex items-end pb-16 lg:pb-24">
-        <div key={current.id} className="max-w-2xl">
-          <div
-            className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full border border-white/[0.1] bg-white/[0.03]"
-            style={{ animation: 'fadeUp 500ms ease-out' }}
-          >
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ background: 'linear-gradient(135deg, #7c5cff, #ff6b9d)' }}
-            />
-            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(245,245,247,0.7)]">
-              {type === 'tv' ? 'Featured Series' : 'Featured Film'}
-            </span>
-          </div>
-
-          <h1
-            className="text-[40px] sm:text-[52px] lg:text-[64px] font-bold text-white tracking-[-0.03em] leading-[0.95] mb-5"
-            style={{ animation: 'fadeUp 600ms 80ms ease-out backwards' }}
-          >
-            {title}
-          </h1>
-
-          <div
-            className="flex items-center flex-wrap gap-x-4 gap-y-1.5 mb-5 text-[13px] text-[rgba(245,245,247,0.7)]"
-            style={{ animation: 'fadeUp 600ms 160ms ease-out backwards' }}
-          >
-            {year && <span>{year}</span>}
-            {rating && (
-              <span className="flex items-center gap-1.5">
-                <span className="text-[#f5c451]">★</span>
-                <span className="font-medium text-[#f5f5f7]">{rating}</span>
-              </span>
-            )}
-            <span className="px-1.5 py-0.5 rounded border border-white/[0.15] text-[10px] font-medium uppercase tracking-wider">
-              {type === 'tv' ? 'Series' : 'Film'}
-            </span>
-            {current.genre_ids?.slice(0, 3).map((gid: number) => {
-              const g = MOCK_GENRES.find((x) => x.id === gid);
-              return g ? (
-                <span key={gid} className="text-[rgba(245,245,247,0.5)]">
-                  {g.name}
-                </span>
-              ) : null;
-            })}
-          </div>
-
-          {current.overview && (
-            <p
-              className="text-[15px] leading-[1.65] text-[rgba(245,245,247,0.78)] max-w-[560px] mb-7 line-clamp-3"
-              style={{ animation: 'fadeUp 600ms 240ms ease-out backwards' }}
-            >
-              {current.overview}
-            </p>
-          )}
-
-          <div
-            className="flex items-center gap-3"
-            style={{ animation: 'fadeUp 600ms 320ms ease-out backwards' }}
-          >
-            <button
-              onClick={goToDetails}
-              className="group inline-flex items-center gap-2 h-12 px-6 rounded-xl font-semibold text-[14px] text-black transition-all duration-300 active:scale-[0.98] cursor-pointer"
-              style={{
-                background: '#ffffff',
-                boxShadow: '0 8px 32px rgba(255,255,255,0.15)',
+      {/* ── CONTENT — AnimatePresence for clean exit/enter ── */}
+      <div className={`relative h-full ${CONTAINER} flex items-end pb-16 lg:pb-24`}>
+        <div className="relative max-w-2xl w-full">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={current.id}
+              initial={{ opacity: 0, y: 24, filter: 'blur(6px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -16, filter: 'blur(6px)' }}
+              transition={{
+                duration: phase === 'exiting' ? CONTENT_EXIT_MS / 1000 : CONTENT_ENTER_MS / 1000,
+                ease: [0.22, 1, 0.36, 1],
               }}
             >
-              <Play className="w-4 h-4 fill-current" strokeWidth={0} />
-              <span>Play</span>
-            </button>
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full border border-white/[0.1] bg-white/[0.03] backdrop-blur-sm">
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: 'linear-gradient(135deg, #7c5cff, #ff6b9d)' }}
+                />
+                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(245,245,247,0.7)]">
+                  {type === 'tv' ? 'Featured Series' : 'Featured Film'}
+                </span>
+              </div>
 
-            <button
-              onClick={goToDetails}
-              className="inline-flex items-center gap-2 h-12 px-6 rounded-xl font-semibold text-[14px] text-white border border-white/[0.15] bg-white/[0.05] hover:bg-white/[0.1] backdrop-blur transition-all duration-300 active:scale-[0.98] cursor-pointer"
-            >
-              <Info className="w-4 h-4" strokeWidth={2} />
-              <span>More Info</span>
-            </button>
-          </div>
+              {/* Title */}
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+                className="text-[40px] sm:text-[52px] lg:text-[64px] font-bold text-white tracking-[-0.03em] leading-[0.95] mb-5"
+              >
+                {title}
+              </motion.h1>
+
+              {/* Meta */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+                className="flex items-center flex-wrap gap-x-4 gap-y-1.5 mb-5 text-[13px] text-[rgba(245,245,247,0.7)]"
+              >
+                {year && <span>{year}</span>}
+                {rating && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-[#f5c451]">★</span>
+                    <span className="font-medium text-[#f5f5f7]">{rating}</span>
+                  </span>
+                )}
+                <span className="px-1.5 py-0.5 rounded border border-white/[0.15] text-[10px] font-medium uppercase tracking-wider">
+                  {type === 'tv' ? 'Series' : 'Film'}
+                </span>
+                {current.genre_ids?.slice(0, 3).map((gid: number) => {
+                  const g = MOCK_GENRES.find((x) => x.id === gid);
+                  return g ? (
+                    <span key={gid} className="text-[rgba(245,245,247,0.5)]">
+                      {g.name}
+                    </span>
+                  ) : null;
+                })}
+              </motion.div>
+
+              {/* Overview */}
+              {current.overview && (
+                <motion.p
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.55, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-[15px] leading-[1.65] text-[rgba(245,245,247,0.78)] max-w-[560px] mb-7 line-clamp-3"
+                >
+                  {current.overview}
+                </motion.p>
+              )}
+
+              {/* Buttons */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, delay: 0.26, ease: [0.22, 1, 0.36, 1] }}
+                className="flex items-center gap-3"
+              >
+                <button
+                  onClick={goToDetails}
+                  className="group inline-flex items-center gap-2 h-12 px-6 rounded-xl font-semibold text-[14px] text-black transition-all duration-300 active:scale-[0.97] cursor-pointer hover:-translate-y-0.5"
+                  style={{
+                    background: '#ffffff',
+                    boxShadow: '0 8px 32px rgba(255,255,255,0.15)',
+                  }}
+                >
+                  <Play className="w-4 h-4 fill-current" strokeWidth={0} />
+                  <span>Play</span>
+                </button>
+
+                <button
+                  onClick={goToDetails}
+                  className="inline-flex items-center gap-2 h-12 px-6 rounded-xl font-semibold text-[14px] text-white border border-white/[0.15] bg-white/[0.05] hover:bg-white/[0.1] backdrop-blur transition-all duration-300 active:scale-[0.97] cursor-pointer hover:-translate-y-0.5"
+                >
+                  <Info className="w-4 h-4" strokeWidth={2} />
+                  <span>More Info</span>
+                </button>
+              </motion.div>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 
+      {/* ── Dots ── */}
       {featured.length > 1 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2">
-          {featured.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setIndex(i)}
-              aria-label={`Slide ${i + 1}`}
-              className="h-1 rounded-full overflow-hidden transition-all duration-500 cursor-pointer"
-              style={{
-                width: i === index ? 32 : 8,
-                background:
-                  i === index
-                    ? 'linear-gradient(90deg, #7c5cff, #ff6b9d)'
-                    : 'rgba(255,255,255,0.25)',
-              }}
-            />
-          ))}
+        <div className={`absolute bottom-6 left-0 right-0 ${CONTAINER} pointer-events-none`}>
+          <div className="flex items-center gap-2 pointer-events-auto">
+            {featured.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => goToSlide(i)}
+                aria-label={`Slide ${i + 1}`}
+                className="relative h-1 rounded-full overflow-hidden transition-all duration-500 cursor-pointer"
+                style={{
+                  width: i === index ? 40 : 8,
+                  background:
+                    i === index
+                      ? 'rgba(255,255,255,0.15)'
+                      : 'rgba(255,255,255,0.25)',
+                }}
+              >
+                {i === index && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-y-0 left-0 rounded-full"
+                    style={{
+                      background: 'linear-gradient(90deg, #7c5cff, #ff6b9d)',
+                      animation: `heroProgress ${SLIDE_INTERVAL_MS}ms linear forwards`,
+                    }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       <style>{`
-        @keyframes kenburns {
-          from { transform: scale(1) translate(0, 0); }
-          to   { transform: scale(1.08) translate(-1%, -1%); }
+        @keyframes heroKenBurns {
+          from { transform: scale(1.02) translate(0, 0); }
+          to   { transform: scale(1.10) translate(-1%, -1%); }
         }
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(16px); }
-          to   { opacity: 1; transform: translateY(0); }
+        @keyframes heroProgress {
+          from { width: 0%; }
+          to   { width: 100%; }
         }
         @media (prefers-reduced-motion: reduce) {
-          [style*="kenburns"], [style*="fadeUp"] {
+          [style*="heroKenBurns"],
+          [style*="heroProgress"] {
             animation: none !important;
           }
         }
@@ -232,7 +336,7 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
 };
 
 /* ────────────────────────────────────────────────
-   Horizontal Row — uses MovieCard
+   Row
    ──────────────────────────────────────────────── */
 const Row: React.FC<{
   title: string;
@@ -274,15 +378,11 @@ const Row: React.FC<{
       <div className="relative group/row">
         <div
           className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity"
-          style={{
-            background: 'linear-gradient(90deg, #0a0a0b 0%, transparent 100%)',
-          }}
+          style={{ background: 'linear-gradient(90deg, #0a0a0b 0%, transparent 100%)' }}
         />
         <div
           className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity"
-          style={{
-            background: 'linear-gradient(270deg, #0a0a0b 0%, transparent 100%)',
-          }}
+          style={{ background: 'linear-gradient(270deg, #0a0a0b 0%, transparent 100%)' }}
         />
 
         <button
@@ -310,11 +410,7 @@ const Row: React.FC<{
               key={`${item.media_type || 'x'}-${item.id}-${i}`}
               className="w-[160px] sm:w-[180px] shrink-0"
             >
-              <MovieCard
-                item={item}
-                rank={ranked ? i + 1 : undefined}
-                index={i}
-              />
+              <MovieCard item={item} rank={ranked ? i + 1 : undefined} index={i} />
             </div>
           ))}
         </div>
@@ -344,6 +440,8 @@ const ContinueCard: React.FC<{ item: HistoryItem }> = ({ item }) => {
           <img
             src={backdrop}
             alt={item.title}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
@@ -384,8 +482,7 @@ const ContinueCard: React.FC<{ item: HistoryItem }> = ({ item }) => {
 };
 
 /* ────────────────────────────────────────────────
-   Continue Watching Row — horizontal scroller
-   Same style as Row, but using ContinueCard
+   Continue Watching Row
    ──────────────────────────────────────────────── */
 const ContinueWatchingRow: React.FC<{ items: HistoryItem[]; total: number }> = ({
   items,
@@ -424,15 +521,11 @@ const ContinueWatchingRow: React.FC<{ items: HistoryItem[]; total: number }> = (
       <div className="relative group/row">
         <div
           className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity"
-          style={{
-            background: 'linear-gradient(90deg, #0a0a0b 0%, transparent 100%)',
-          }}
+          style={{ background: 'linear-gradient(90deg, #0a0a0b 0%, transparent 100%)' }}
         />
         <div
           className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity"
-          style={{
-            background: 'linear-gradient(270deg, #0a0a0b 0%, transparent 100%)',
-          }}
+          style={{ background: 'linear-gradient(270deg, #0a0a0b 0%, transparent 100%)' }}
         />
 
         <button
@@ -476,15 +569,16 @@ export const Home: React.FC = () => {
   const { data: trending = [] } = useTrending();
   const { data: popularMovies = [] } = usePopularMovies();
   const { data: topRatedTV = [] } = useTopRatedTV();
+  const { data: indianMovies = [] } = useIndianMovies();
 
   const queryClient = useQueryClient();
 
-  /* Prefetch trailers for the first few rows so hover plays instantly */
   useEffect(() => {
     const allItems: any[] = [
       ...trending.slice(0, 12),
       ...popularMovies.slice(0, 12),
       ...topRatedTV.slice(0, 12),
+      ...indianMovies.slice(0, 12),
     ];
 
     const timers: number[] = [];
@@ -504,7 +598,7 @@ export const Home: React.FC = () => {
     return () => {
       timers.forEach((t) => window.clearTimeout(t));
     };
-  }, [trending, popularMovies, topRatedTV, queryClient]);
+  }, [trending, popularMovies, topRatedTV, indianMovies, queryClient]);
 
   const [history, setHistory] = useState<HistoryItem[]>(() =>
     readHistoryFromStorage()
@@ -534,8 +628,7 @@ export const Home: React.FC = () => {
     <div className="pb-24">
       <Hero items={trending} />
 
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 space-y-16 mt-4">
-        {/* Continue Watching — now a horizontal scroller */}
+      <div className={`${CONTAINER} space-y-16 mt-4`}>
         {continueWatching.length > 0 && (
           <ContinueWatchingRow
             items={continueWatching}
@@ -553,7 +646,7 @@ export const Home: React.FC = () => {
 
         <Row
           title="Popular Masterpieces"
-          subtitle="Curated for you"
+          subtitle="For you..."
           items={popularMovies}
           icon={<Sparkles className="w-3 h-3" strokeWidth={2} />}
         />
@@ -562,6 +655,13 @@ export const Home: React.FC = () => {
           title="Top Rated TV Series"
           subtitle="Episodic Sagas"
           items={topRatedTV}
+        />
+
+        <Row
+          title="Indian Movies"
+          subtitle="Bollywood & Beyond"
+          items={indianMovies}
+          icon={<Flame className="w-3 h-3" strokeWidth={2} />}
         />
       </div>
     </div>
