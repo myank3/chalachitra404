@@ -1,37 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Plus, Check, Star } from 'lucide-react';
 import { MediaItem } from '../types';
 import { getImageUrl } from '../lib/api';
+import { useWatchlist } from '../stores/watchlist';
+import { useHoverPreview } from '../stores/hoverPreview';
 
 interface MovieCardProps {
   item: MediaItem;
   rank?: number;
-  priority?: boolean;
+  index?: number;
 }
 
-const WATCHLIST_KEY = 'chalachitra:watchlist';
-
 export const MovieCard: React.FC<MovieCardProps> = React.memo(
-  ({ item, rank }) => {
+  ({ item, rank, index = 0 }) => {
     const navigate = useNavigate();
+    const cardRef = useRef<HTMLDivElement>(null);
+    const hoverTimerRef = useRef<number | null>(null);
+
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
-    const [inList, setInList] = useState<boolean>(() => {
-      try {
-        const raw = localStorage.getItem(WATCHLIST_KEY);
-        if (!raw) return false;
-        const arr = JSON.parse(raw);
-        return (
-          Array.isArray(arr) &&
-          arr.some(
-            (w: any) => w.id === item.id && w.type === item.media_type
-          )
-        );
-      } catch {
-        return false;
-      }
-    });
+
+    const showPreview = useHoverPreview((s) => s.show);
+    const hidePreview = useHoverPreview((s) => s.hide);
+
+    const inList = useWatchlist((s) =>
+      Boolean(s.items[`${item.media_type}-${item.id}`])
+    );
+    const toggleWatchlist = useWatchlist((s) => s.toggle);
+
+    const onMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (window.matchMedia('(hover: none)').matches) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = window.setTimeout(() => {
+        showPreview(item, rect);
+      }, 200);
+    };
+
+    const onMouseLeave = () => {
+      if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = window.setTimeout(() => {
+        hidePreview();
+      }, 250);
+    };
 
     const releaseYear = item.release_date
       ? item.release_date.substring(0, 4)
@@ -42,64 +54,52 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
     const posterSrc = getImageUrl(item.poster_path, 'w500');
     const title = item.title || (item as any).name || 'Untitled';
 
-    const handleCardClick = () => {
+    const goToDetails = () => {
+      if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current);
+      hidePreview();
       navigate(`/${item.media_type}/${item.id}`);
     };
 
+    const handleCardClick = () => goToDetails();
+
     const handlePlay = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (item.media_type === 'movie') {
-        navigate(`/watch/movie/${item.id}`);
-      } else {
-        navigate(`/watch/tv/${item.id}?s=1&e=1`);
-      }
+      goToDetails();
     };
 
     const handleToggleList = (e: React.MouseEvent) => {
       e.stopPropagation();
-      try {
-        const raw = localStorage.getItem(WATCHLIST_KEY);
-        const arr = raw ? JSON.parse(raw) : [];
-        const list = Array.isArray(arr) ? arr : [];
-        const exists = list.some(
-          (w: any) => w.id === item.id && w.type === item.media_type
-        );
-        const next = exists
-          ? list.filter(
-              (w: any) => !(w.id === item.id && w.type === item.media_type)
-            )
-          : [
-              ...list,
-              {
-                id: item.id,
-                type: item.media_type,
-                title,
-                posterPath: item.poster_path,
-                backdropPath: item.backdrop_path,
-                year: releaseYear,
-                rating: item.vote_average,
-                overview: item.overview,
-              },
-            ];
-        localStorage.setItem(WATCHLIST_KEY, JSON.stringify(next));
-        setInList(!exists);
-      } catch {
-        setInList((v) => !v);
-      }
+      toggleWatchlist({
+        id: item.id,
+        type: item.media_type,
+        title,
+        posterPath: item.poster_path,
+        backdropPath: item.backdrop_path,
+        year: releaseYear,
+        rating: item.vote_average,
+        overview: item.overview,
+      });
     };
+
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     return (
       <div
+        ref={cardRef}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         onClick={handleCardClick}
         className="group relative cursor-pointer select-none"
+        style={{
+          animation: prefersReduced
+            ? 'none'
+            : `mcFadeUp 500ms cubic-bezier(0.16,1,0.3,1) ${index * 40}ms backwards`,
+        }}
       >
         {/* Poster */}
-        <div
-          className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/[0.08] group-hover:border-[rgba(124,92,255,0.4)] transition-all duration-300"
-          style={{
-            transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        >
+        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/[0.08] group-hover:border-[rgba(124,92,255,0.4)] transition-all duration-300 group-hover:shadow-[0_20px_40px_-12px_rgba(124,92,255,0.4)]">
           {posterSrc && !imageError ? (
             <>
               <img
@@ -110,7 +110,7 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
                 referrerPolicy="no-referrer"
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setImageError(true)}
-                className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-[1.06] ${
+                className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05] ${
                   imageLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
               />
@@ -126,10 +126,9 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
             </div>
           )}
 
-          {/* Gradient scrim */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-90 pointer-events-none" />
 
-          {/* Rank badge — top 3 gradient */}
+          {/* Rank badge */}
           {rank !== undefined && (
             <div
               className="absolute top-2.5 left-2.5 w-8 h-8 rounded-xl flex items-center justify-center font-bold text-[13px] text-white z-10"
@@ -151,7 +150,7 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
             </div>
           )}
 
-          {/* Rating — top right */}
+          {/* Rating chip */}
           {item.vote_average > 0 && (
             <div className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[11px] font-medium tabular-nums text-white px-2 py-0.5 rounded-md bg-black/70 backdrop-blur border border-white/[0.08] z-10">
               <Star
@@ -162,9 +161,8 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
             </div>
           )}
 
-          {/* Hover overlay with actions */}
+          {/* Hover overlay */}
           <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2.5">
-            {/* Play */}
             <button
               type="button"
               onClick={handlePlay}
@@ -178,7 +176,6 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
               <Play className="w-4 h-4 fill-current ml-0.5" strokeWidth={0} />
             </button>
 
-            {/* Secondary actions */}
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -227,6 +224,16 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
             </span>
           </div>
         </div>
+
+        <style>{`
+          @keyframes mcFadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            [style*="mcFadeUp"] { animation: none !important; }
+          }
+        `}</style>
       </div>
     );
   }

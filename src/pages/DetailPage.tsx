@@ -18,7 +18,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Determine media type from props or pathname
   const type: MediaType =
     propType || (location.pathname.startsWith('/tv') ? 'tv' : 'movie');
 
@@ -26,17 +25,14 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [showTrailer, setShowTrailer] = useState(false);
 
-  // Fetch TMDB data
   const { data: item, isLoading } = useDetails(type, id || null);
   const { data: similarItems = [] } = useSimilar(type, id || '');
 
-  // For TV: fetch season details for episode list
   const { data: seasonData, isLoading: seasonLoading } = useSeasonDetails(
     type === 'tv' ? id : null,
     selectedSeason
   );
 
-  // Progress helper for TV
   const loadProgress = (mediaId: string | number | undefined) => {
     if (!mediaId) return null;
     return (
@@ -92,9 +88,49 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
     ? item.first_air_date.substring(0, 4)
     : '2026';
 
-  const trailer = item.videos?.results?.find(
-    (v) => (v.type === 'Trailer' || v.type === 'Teaser') && v.site === 'YouTube'
-  );
+  /* ---------- Trailer sourcing: Vimeo first, YouTube fallback ---------- */
+  const buildTrailer = (videos: any[] = []) => {
+    // Prefer Vimeo — cleaner embeds, no sign-in walls
+    const vimeo =
+      videos.find((v) => v.site === 'Vimeo' && v.type === 'Trailer') ??
+      videos.find((v) => v.site === 'Vimeo' && v.type === 'Teaser') ??
+      videos.find((v) => v.site === 'Vimeo');
+    if (vimeo) {
+      return {
+        site: 'Vimeo' as const,
+        name: vimeo.name,
+        key: vimeo.key,
+        src:
+          `https://player.vimeo.com/video/${vimeo.key}` +
+          `?autoplay=1&muted=0&background=1&playsinline=1`,
+        externalUrl: `https://vimeo.com/${vimeo.key}`,
+      };
+    }
+
+    // Fall back to YouTube — prefer official trailers
+    const yt =
+      videos.find(
+        (v) => v.site === 'YouTube' && v.type === 'Trailer' && v.official
+      ) ??
+      videos.find((v) => v.site === 'YouTube' && v.type === 'Trailer') ??
+      videos.find((v) => v.site === 'YouTube' && v.type === 'Teaser') ??
+      videos.find((v) => v.site === 'YouTube');
+    if (yt) {
+      return {
+        site: 'YouTube' as const,
+        name: yt.name,
+        key: yt.key,
+        src:
+          `https://www.youtube-nocookie.com/embed/${yt.key}` +
+          `?autoplay=1&mute=0&modestbranding=1` +
+          `&origin=${encodeURIComponent(window.location.origin)}`,
+        externalUrl: `https://www.youtube.com/watch?v=${yt.key}`,
+      };
+    }
+    return null;
+  };
+
+  const trailer = buildTrailer(item.videos?.results);
 
   const availableSeasons = (item.seasons || []).filter((s) => s.season_number > 0);
   const episodesList = seasonData?.episodes || [];
@@ -113,7 +149,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
         </button>
       </div>
 
-      {/* 2. Hero Presentation Container (No inline player iframe) */}
+      {/* 2. Hero Presentation Container */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="relative rounded-2xl overflow-hidden bg-[#111113] border border-white/[0.08]">
           {/* Backdrop Image Banner */}
@@ -124,11 +160,9 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
               className="w-full h-full object-cover object-center"
               referrerPolicy="no-referrer"
             />
-            {/* Ambient gradients */}
             <div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-[#111113]/70 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-r from-[#111113]/90 via-[#111113]/40 to-transparent" />
 
-            {/* Poster & Title Details overlaid at bottom */}
             <div className="absolute inset-0 flex flex-col justify-end p-6 sm:p-10">
               <div className="max-w-3xl">
                 {/* Meta row */}
@@ -160,21 +194,17 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                   )}
                 </div>
 
-                {/* Main Title */}
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#f5f5f7] font-heading tracking-[-0.02em] leading-tight mb-2">
                   {item.title}
                 </h1>
 
-                {/* Tagline */}
                 {item.tagline && (
                   <p className="text-xs sm:text-sm italic text-[rgba(245,245,247,0.62)] mb-3">
                     "{item.tagline}"
                   </p>
                 )}
 
-                {/* Action Buttons */}
                 <div className="flex flex-wrap items-center gap-2.5 pt-2">
-                  {/* Play Button - Navigates to dedicated Watch page */}
                   <button
                     type="button"
                     onClick={() => {
@@ -190,7 +220,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                     <span>Watch Now</span>
                   </button>
 
-                  {/* Resume Button (TV only) */}
                   {type === 'tv' && hasProgress && (
                     <button
                       type="button"
@@ -207,7 +236,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                     </button>
                   )}
 
-                  {/* Add to List Button - Compact & Sleek */}
                   <WatchlistButton
                     item={{
                       id: item.id,
@@ -223,7 +251,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                     size="sm"
                   />
 
-                  {/* Trailer toggle */}
                   {trailer && (
                     <button
                       type="button"
@@ -239,11 +266,16 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
             </div>
           </div>
 
-          {/* Embedded YouTube Trailer if requested */}
+          {/* Embedded Trailer (Vimeo first, YouTube fallback) */}
           {showTrailer && trailer && (
             <div className="p-4 sm:p-6 border-t border-white/[0.08] bg-[#17171a]">
               <div className="flex items-center justify-between mb-3 text-[11px] text-[rgba(245,245,247,0.62)] font-medium uppercase tracking-[0.08em]">
-                <span>Official Trailer: {trailer.name}</span>
+                <span>
+                  Official Trailer: {trailer.name}
+                  <span className="ml-2 text-white/30 normal-case tracking-normal">
+                    via {trailer.site}
+                  </span>
+                </span>
                 <button
                   type="button"
                   onClick={() => setShowTrailer(false)}
@@ -252,21 +284,35 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                   Close
                 </button>
               </div>
+
               <div className="relative aspect-video max-w-3xl mx-auto rounded-xl overflow-hidden bg-black border border-white/[0.08]">
                 <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${trailer.key}?autoplay=1&modestbranding=1`}
+                  key={trailer.src}
+                  src={trailer.src}
                   title={trailer.name}
                   className="w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  referrerPolicy="strict-origin-when-cross-origin"
                   allowFullScreen
                 />
+              </div>
+
+              {/* Fallback link if the embed is blocked */}
+              <div className="max-w-3xl mx-auto mt-3 text-center">
+                <a
+                  href={trailer.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-white/45 hover:text-white/80 transition-colors"
+                >
+                  Trailer not playing? Open in a new tab →
+                </a>
               </div>
             </div>
           )}
 
           {/* Details Body */}
           <div className="p-6 sm:p-8 space-y-7">
-            {/* Overview & Genres */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-2 space-y-3">
                 <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)]">
@@ -353,7 +399,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                 </p>
               </div>
 
-              {/* Season Selector */}
               {availableSeasons.length > 0 && (
                 <div className="relative inline-block">
                   <select
@@ -379,7 +424,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
               )}
             </div>
 
-            {/* Episode List (Each navigates directly to /watch/tv/:id?s=${season}&e=${episode}) */}
             {seasonLoading ? (
               <div className="py-12 text-center text-sm text-[rgba(245,245,247,0.38)]">
                 Loading episodes...
@@ -411,7 +455,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                       }`}
                     >
                       <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
-                        {/* Thumbnail */}
                         <div className="relative w-28 sm:w-36 aspect-video shrink-0 rounded-lg overflow-hidden bg-black/60 border border-white/[0.06]">
                           {ep.still_path ? (
                             <img
@@ -437,7 +480,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                           </span>
                         </div>
 
-                        {/* Title and metadata */}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-xs font-semibold text-[#f5f5f7] truncate">
@@ -457,7 +499,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                         </div>
                       </div>
 
-                      {/* Play Action Button */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -523,3 +564,5 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
     </div>
   );
 };
+
+export default DetailPage;

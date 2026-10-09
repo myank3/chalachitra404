@@ -17,14 +17,15 @@ import { PROVIDERS, buildEmbedUrl } from '../lib/embedProviders';
 import { useWatchlist } from '../stores/watchlist';
 import { useUIStore } from '../stores/useUIStore';
 import { RecommendedRow } from '../components/RecommendedRow';
-import { recordHistory, recordWatched } from '../lib/recommend';
+import { recordWatched } from '../lib/recommend';
 import { Mascot } from '../components/Mascot';
+import { ServerDropdown } from '../components/ServerDropdown';
 
-/* Shared size ladder — change here to resize player + provider row + info panel together */
+/* Shared size ladder */
 const WIDTH_LADDER =
   'w-full max-w-full sm:max-w-[624px] md:max-w-[844px] lg:max-w-[1044px] xl:max-w-[1184px] mx-auto';
 
-/* Memoized iframe — never re-renders on scroll state changes */
+/* Memoized iframe */
 const PlayerFrame = memo(function PlayerFrame({
   url,
   title,
@@ -53,6 +54,9 @@ export const WatchMovie: React.FC = () => {
 
   const { has: isInWatchlist, toggle: toggleWatchlist } = useWatchlist();
   const { saveProgress } = useUIStore();
+
+  /* History — write to the store */
+  const recordHistory = useWatchlist((s) => s.recordHistory);
 
   const [copied, setCopied] = useState(false);
   const [markedWatched, setMarkedWatched] = useState(false);
@@ -87,7 +91,24 @@ export const WatchMovie: React.FC = () => {
     }
   };
 
-  /* ---------- 144Hz-smooth scroll (rAF, quintic ease) ---------- */
+  /* ---------- Record history when movie loads ---------- */
+  useEffect(() => {
+    if (!movie || !id) return;
+
+    recordHistory({
+      id: movie.id,
+      type: 'movie',
+      title: movie.title,
+      posterPath: movie.poster_path,
+      backdropPath: movie.backdrop_path,
+      year: movie.release_date ? movie.release_date.substring(0, 4) : '',
+      rating: movie.vote_average ?? 0,
+      overview: movie.overview,
+      progress: 0.05,
+    });
+  }, [movie, id, recordHistory]);
+
+  /* ---------- 144Hz-smooth scroll ---------- */
   const scrollToDetails = () => {
     const el = detailsRef.current;
     if (!el) return;
@@ -146,7 +167,9 @@ export const WatchMovie: React.FC = () => {
       }
       const orientation = (screen as any).orientation;
       if (orientation?.lock) {
-        try { await orientation.lock('landscape'); } catch {}
+        try {
+          await orientation.lock('landscape');
+        } catch {}
       }
     } catch {}
   };
@@ -155,7 +178,9 @@ export const WatchMovie: React.FC = () => {
     try {
       const orientation = (screen as any).orientation;
       if (orientation?.unlock) {
-        try { orientation.unlock(); } catch {}
+        try {
+          orientation.unlock();
+        } catch {}
       }
       if (document.fullscreenElement) await document.exitFullscreen();
       setIsFullscreen(false);
@@ -171,7 +196,9 @@ export const WatchMovie: React.FC = () => {
       if (!active) {
         const orientation = (screen as any).orientation;
         if (orientation?.unlock) {
-          try { orientation.unlock(); } catch {}
+          try {
+            orientation.unlock();
+          } catch {}
         }
       }
     };
@@ -224,13 +251,20 @@ export const WatchMovie: React.FC = () => {
       progress: 100,
     });
     recordWatched(movie.id);
+    recordHistory({
+      id: movie.id,
+      type: 'movie',
+      title: movie.title,
+      posterPath: movie.poster_path,
+      backdropPath: movie.backdrop_path,
+      year: movie.release_date ? movie.release_date.substring(0, 4) : '',
+      rating: movie.vote_average ?? 0,
+      overview: movie.overview,
+      progress: 1,
+    });
     setMarkedWatched(true);
     toast.success(`Marked "${movie.title}" as watched`);
   };
-
-  useEffect(() => {
-    if (movie) recordHistory(movie);
-  }, [movie]);
 
   /* ---------- Meta formatting ---------- */
   const formatRuntime = (minutes?: number) => {
@@ -258,12 +292,9 @@ export const WatchMovie: React.FC = () => {
 
   return (
     <div className="min-h-screen text-[#f5f5f7] relative overflow-x-hidden bg-[#08080a]">
-      {/* ================= LIGHT AMBIENT (no blur, no drift) ================= */}
+      {/* LIGHT AMBIENT */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        {/* Base gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0b0a14] via-[#08080a] to-[#050507]" />
-
-        {/* Single static radial wash — replaced 3 blurred drifting blobs */}
         <div
           className="absolute inset-0"
           style={{
@@ -272,8 +303,6 @@ export const WatchMovie: React.FC = () => {
               'radial-gradient(55% 40% at 85% 18%, rgba(255,107,157,0.07) 0%, transparent 65%)',
           }}
         />
-
-        {/* Vignette */}
         <div
           className="absolute inset-0"
           style={{
@@ -283,7 +312,7 @@ export const WatchMovie: React.FC = () => {
         />
       </div>
 
-      {/* ================= CONTENT ================= */}
+      {/* CONTENT */}
       <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {/* 1. Back button */}
         <div className="mb-4 animate-[fadeSlideDown_400ms_ease-out_both]">
@@ -373,40 +402,17 @@ export const WatchMovie: React.FC = () => {
           </p>
         </div>
 
-        {/* 3. Provider tabs */}
+        {/* 3. Server dropdown */}
         <div
-          className={`${WIDTH_LADDER} mt-5 flex flex-wrap items-center gap-2 animate-[fadeSlideDown_500ms_ease-out_120ms_both]`}
+          className={`${WIDTH_LADDER} mt-5 flex flex-wrap items-center gap-3 animate-[fadeSlideDown_500ms_ease-out_120ms_both]`}
         >
-          <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)] mr-1 shrink-0">
+          <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)] shrink-0">
             Source:
           </span>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {PROVIDERS.map((provider) => {
-              const isActive = selectedProviderId === provider.id;
-              return (
-                <button
-                  key={provider.id}
-                  type="button"
-                  onClick={() => handleProviderSelect(provider.id)}
-                  className={`relative text-sm py-1 transition-colors duration-200 cursor-pointer ${
-                    isActive
-                      ? 'text-white font-medium'
-                      : 'text-[rgba(245,245,247,0.55)] hover:text-white'
-                  }`}
-                >
-                  {provider.name}
-                  <span
-                    aria-hidden
-                    className={`absolute left-0 right-0 -bottom-0.5 h-[2px] rounded-full transition-all duration-300 ${
-                      isActive
-                        ? 'bg-gradient-to-r from-[#7c5cff] to-[#ff6b9d] opacity-100'
-                        : 'bg-white/20 opacity-0'
-                    }`}
-                  />
-                </button>
-              );
-            })}
-          </div>
+          <ServerDropdown
+            value={selectedProviderId}
+            onChange={handleProviderSelect}
+          />
         </div>
 
         {/* 3b. Scroll for details */}
@@ -512,7 +518,6 @@ export const WatchMovie: React.FC = () => {
         )}
       </div>
 
-      {/* Keyframes — dropped drift1/2/3, kept only what's used */}
       <style>{`
         @keyframes fadeSlideDown {
           from { opacity: 0; transform: translateY(-8px); }

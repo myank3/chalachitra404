@@ -6,6 +6,11 @@ export const TMDB_API_KEY = '4885ba83e8fcc37c495a2e71ece8366d';
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/';
 
+export interface Genre {
+  id: number;
+  name: string;
+}
+
 export const getImageUrl = (
   path: string | null | undefined,
   size: 'w300' | 'w500' | 'w780' | 'w1280' | 'original' = 'w780'
@@ -49,6 +54,39 @@ async function fetchTMDB<T>(
   return response.json();
 }
 
+/* ------------------------------------------------------------------
+   GENRES — real TMDB endpoints. These are the only IDs that
+   /discover/movie and /discover/tv actually understand.
+   ------------------------------------------------------------------ */
+export async function getMovieGenres(signal?: AbortSignal): Promise<Genre[]> {
+  const data = await fetchTMDB<{ genres: Genre[] }>('/genre/movie/list', {}, signal);
+  return data.genres;
+}
+
+export async function getTVGenres(signal?: AbortSignal): Promise<Genre[]> {
+  const data = await fetchTMDB<{ genres: Genre[] }>('/genre/tv/list', {}, signal);
+  return data.genres;
+}
+
+export function useMovieGenres() {
+  return useQuery({
+    queryKey: ['genres', 'movie'],
+    queryFn: ({ signal }) => getMovieGenres(signal),
+    staleTime: 1000 * 60 * 60 * 24,
+  });
+}
+
+export function useTVGenres() {
+  return useQuery({
+    queryKey: ['genres', 'tv'],
+    queryFn: ({ signal }) => getTVGenres(signal),
+    staleTime: 1000 * 60 * 60 * 24,
+  });
+}
+
+/* ------------------------------------------------------------------
+   LISTS
+   ------------------------------------------------------------------ */
 export async function getTrending(signal?: AbortSignal): Promise<MediaItem[]> {
   try {
     const data = await fetchTMDB<{ results: MediaItem[] }>('/trending/all/week', {}, signal);
@@ -94,12 +132,16 @@ export async function getTopRatedTV(signal?: AbortSignal): Promise<MediaItem[]> 
   }
 }
 
+/* ------------------------------------------------------------------
+   DISCOVER — genre-driven, uses real TMDB genre IDs
+   ------------------------------------------------------------------ */
 export async function getDiscoverMovies(
   params: {
     page?: number;
     with_genres?: number | string;
     primary_release_year?: number | string;
     'vote_average.gte'?: number;
+    'vote_count.gte'?: number;
     sort_by?: string;
   } = {},
   signal?: AbortSignal
@@ -124,13 +166,8 @@ export async function getDiscoverMovies(
     };
   } catch (error) {
     if ((error as Error)?.name === 'AbortError') throw error;
-    console.warn('Falling back to mock movies:', error);
-    let filtered = MOCK_MEDIA_ITEMS.filter((m) => m.media_type === 'movie');
-    if (params.with_genres) {
-      const gId = Number(params.with_genres);
-      filtered = filtered.filter((m) => m.genre_ids?.includes(gId));
-    }
-    return { results: filtered, page: 1, total_pages: 1 };
+    console.warn('Discover movies failed:', error);
+    return { results: [], page: 1, total_pages: 0 };
   }
 }
 
@@ -140,6 +177,7 @@ export async function getDiscoverTV(
     with_genres?: number | string;
     first_air_date_year?: number | string;
     'vote_average.gte'?: number;
+    'vote_count.gte'?: number;
     sort_by?: string;
   } = {},
   signal?: AbortSignal
@@ -163,16 +201,14 @@ export async function getDiscoverTV(
     };
   } catch (error) {
     if ((error as Error)?.name === 'AbortError') throw error;
-    console.warn('Falling back to mock TV:', error);
-    let filtered = MOCK_MEDIA_ITEMS.filter((m) => m.media_type === 'tv');
-    if (params.with_genres) {
-      const gId = Number(params.with_genres);
-      filtered = filtered.filter((m) => m.genre_ids?.includes(gId));
-    }
-    return { results: filtered, page: 1, total_pages: 1 };
+    console.warn('Discover TV failed:', error);
+    return { results: [], page: 1, total_pages: 0 };
   }
 }
 
+/* ------------------------------------------------------------------
+   SEARCH
+   ------------------------------------------------------------------ */
 export async function searchAll(query: string, signal?: AbortSignal): Promise<MediaItem[]> {
   if (!query.trim()) return [];
   try {
@@ -189,16 +225,14 @@ export async function searchAll(query: string, signal?: AbortSignal): Promise<Me
       }));
   } catch (error) {
     if ((error as Error)?.name === 'AbortError') throw error;
-    console.warn('Using mock search:', error);
-    const q = query.toLowerCase();
-    return MOCK_MEDIA_ITEMS.filter(
-      (m) =>
-        m.title.toLowerCase().includes(q) ||
-        (m.overview && m.overview.toLowerCase().includes(q))
-    );
+    console.warn('Search failed:', error);
+    return [];
   }
 }
 
+/* ------------------------------------------------------------------
+   DETAILS
+   ------------------------------------------------------------------ */
 export async function getDetails(
   type: MediaType,
   id: string | number,
@@ -220,7 +254,7 @@ export async function getDetails(
     };
   } catch (error) {
     if ((error as Error)?.name === 'AbortError') throw error;
-    console.warn('Using mock details for id:', id);
+    console.warn('Details failed for id:', id, error);
     const found = MOCK_MEDIA_ITEMS.find((m) => String(m.id) === String(id));
     if (found) return found;
     return {
@@ -253,7 +287,9 @@ export async function getSimilar(
   }
 }
 
-// TanStack Query Hooks
+/* ------------------------------------------------------------------
+   TANSTACK QUERY HOOKS
+   ------------------------------------------------------------------ */
 export function useTrending() {
   return useQuery({
     queryKey: ['trending'],
