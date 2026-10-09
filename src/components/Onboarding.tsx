@@ -1,11 +1,55 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
-import { Mascot } from './Mascot';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ChevronRight, Play } from 'lucide-react';
 
 const ONBOARDED_KEY = 'chalachitra:onboarded';
 
+type Slide = {
+  id: string;
+  eyebrow?: string;
+  title: string;
+  subtitle: string;
+  backdrop: string;
+  accent: string;
+  cta: string;
+};
+
+const SLIDES: Slide[] = [
+  {
+    id: 'welcome',
+    eyebrow: 'WELCOME',
+    title: 'Every frame matters.',
+    subtitle:
+      'A streaming experience built around taste — not algorithms. Watch films the way they were meant to be seen.',
+    backdrop:
+      'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=2400&auto=format&fit=crop',
+    accent: '#7c5cff',
+    cta: 'Continue',
+  },
+  {
+    id: 'discover',
+    eyebrow: 'FOR FILM LOVERS',
+    title: 'Built for film lovers.',
+    subtitle:
+      'Deep metadata. Multi-server playback. No clutter, no noise — just cinema.',
+    backdrop:
+      'https://images.unsplash.com/photo-1478720568477-152d9b164e26?q=80&w=2400&auto=format&fit=crop',
+    accent: '#ff6b9d',
+    cta: 'Continue',
+  },
+  {
+    id: 'ready',
+    eyebrow: 'READY',
+    title: 'Let\'s begin.',
+    subtitle:
+      'Your library is empty. Start exploring — recommendations will sharpen as you watch.',
+    backdrop:
+      'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?q=80&w=2400&auto=format&fit=crop',
+    accent: '#7c5cff',
+    cta: 'Enter',
+  },
+];
+
 export const Onboarding: React.FC = () => {
-  /* Synchronous initial state — no delayed mount, no click race */
   const [show, setShow] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -16,31 +60,45 @@ export const Onboarding: React.FC = () => {
   });
   const [step, setStep] = useState(0);
   const [exiting, setExiting] = useState(false);
+  const timerRef = useRef<number | null>(null);
 
   const handleDismiss = useCallback(() => {
     setExiting(true);
-    window.setTimeout(() => {
+    timerRef.current = window.setTimeout(() => {
       try {
         localStorage.setItem(ONBOARDED_KEY, 'true');
       } catch {
-        // ignore
+        /* ignore */
       }
       setShow(false);
       setExiting(false);
-    }, 280);
+    }, 600);
   }, []);
 
-  /* Escape to dismiss */
+  const goNext = useCallback(() => {
+    if (step >= SLIDES.length - 1) {
+      handleDismiss();
+    } else {
+      setStep((s) => s + 1);
+    }
+  }, [step, handleDismiss]);
+
+  const goBack = useCallback(() => {
+    if (step === 0) return;
+    setStep((s) => s - 1);
+  }, [step]);
+
   useEffect(() => {
     if (!show) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleDismiss();
+      else if (e.key === 'ArrowRight' || e.key === 'Enter') goNext();
+      else if (e.key === 'ArrowLeft') goBack();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [show, handleDismiss]);
+  }, [show, handleDismiss, goNext, goBack]);
 
-  /* Body scroll lock while visible */
   useEffect(() => {
     if (!show) return;
     const prev = document.body.style.overflow;
@@ -50,220 +108,212 @@ export const Onboarding: React.FC = () => {
     };
   }, [show]);
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+  }, []);
+
   if (!show) return null;
 
-  const steps = [
-    {
-      eyebrow: 'WELCOME',
-      title: 'Meet Chitra',
-      body: 'Your cinematic companion. I learn what you love and surface titles you didn\'t know you needed.',
-      cta: 'Continue',
-    },
-    {
-      eyebrow: 'DISCOVER',
-      title: 'Built for film lovers',
-      body: 'Curated rows, deep metadata, multi-server playback. No clutter, no noise.',
-      cta: 'Continue',
-    },
-    {
-      eyebrow: 'READY',
-      title: 'Let\'s begin',
-      body: 'Your library is empty. Start exploring — I\'ll pick up your taste as you go.',
-      cta: 'Enter Chalachitra',
-    },
-  ];
-
-  const current = steps[step];
-  const isLast = step === steps.length - 1;
-
-  const handleNext = () => {
-    if (isLast) {
-      handleDismiss();
-    } else {
-      setStep((s) => s + 1);
-    }
-  };
+  const slide = SLIDES[step];
+  const isLast = step === SLIDES.length - 1;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Welcome to Chalachitra"
-      className={`fixed inset-0 z-[100] flex items-center justify-center p-4 transition-opacity duration-300 ${
-        exiting ? 'opacity-0' : 'opacity-100'
-      }`}
+      aria-label="Welcome"
+      className="fixed inset-0 z-[100] overflow-hidden bg-black"
+      style={{
+        opacity: exiting ? 0 : 1,
+        transition: 'opacity 600ms cubic-bezier(0.4, 0, 0.2, 1)',
+      }}
     >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/85"
-        style={{
-          backdropFilter: 'blur(24px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(140%)',
-        }}
-        onClick={handleDismiss}
-      />
+      {/* Full-bleed backdrop with crossfade */}
+      <div className="absolute inset-0">
+        {SLIDES.map((s, i) => (
+          <div
+            key={s.id}
+            aria-hidden={i !== step}
+            className="absolute inset-0 transition-opacity duration-[900ms] ease-out"
+            style={{
+              opacity: i === step ? 1 : 0,
+              backgroundImage: `url(${s.backdrop})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          />
+        ))}
+      </div>
 
-      {/* Ambient orbs behind the card */}
+      {/* Cinematic gradient overlays */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 pointer-events-none overflow-hidden"
-      >
-        <div
-          className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full opacity-40"
-          style={{
-            background:
-              'radial-gradient(circle, rgba(124,92,255,0.35) 0%, transparent 70%)',
-            filter: 'blur(60px)',
-            animation: 'onboardingFloatA 8s ease-in-out infinite',
-          }}
-        />
-        <div
-          className="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full opacity-40"
-          style={{
-            background:
-              'radial-gradient(circle, rgba(255,107,157,0.3) 0%, transparent 70%)',
-            filter: 'blur(60px)',
-            animation: 'onboardingFloatB 10s ease-in-out infinite',
-          }}
-        />
-      </div>
-
-      {/* Card */}
-      <div
-        className={`relative w-full max-w-md rounded-3xl overflow-hidden transition-all duration-500 ${
-          exiting
-            ? 'opacity-0 scale-95 translate-y-2'
-            : 'opacity-100 scale-100 translate-y-0'
-        }`}
+        className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'rgba(17,17,19,0.9)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(24px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+          background:
+            'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.65) 35%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0.7) 100%)',
         }}
-      >
-        {/* Top gradient hairline */}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 45%, transparent 70%)',
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none transition-colors duration-700"
+        style={{
+          background: `radial-gradient(ellipse at 20% 80%, ${slide.accent}22 0%, transparent 55%)`,
+        }}
+      />
+
+      {/* Top bar — minimal: brand mark + skip */}
+      <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 md:px-12 py-6">
         <div
-          className="absolute top-0 left-0 right-0 h-px"
+          className="h-1.5 w-8 rounded-full"
           style={{
-            background:
-              'linear-gradient(90deg, transparent, rgba(124,92,255,0.6), rgba(255,107,157,0.6), transparent)',
+            background: `linear-gradient(90deg, ${slide.accent}, #ffffff)`,
+            boxShadow: `0 0 20px ${slide.accent}66`,
+            transition: 'background 700ms ease',
           }}
+          aria-hidden="true"
         />
-
-        {/* Card body */}
-        <div className="px-8 pt-10 pb-8 text-center">
-          <div
-            className="flex justify-center mb-6"
-            style={{ animation: 'onboardingMascot 4s ease-in-out infinite' }}
-          >
-            <Mascot state="idle" size={110} />
-          </div>
-
-          <div
-            key={`eyebrow-${step}`}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/[0.1] bg-white/[0.03] mb-4"
-            style={{ animation: 'onboardingFadeUp 400ms ease-out' }}
-          >
-            <Sparkles className="w-3 h-3 text-[#7c5cff]" strokeWidth={2} />
-            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(245,245,247,0.6)]">
-              {current.eyebrow}
-            </span>
-          </div>
-
-          <h2
-            key={`title-${step}`}
-            className="text-[26px] font-semibold tracking-[-0.02em] text-[#f5f5f7] mb-3"
-            style={{ animation: 'onboardingFadeUp 400ms 60ms ease-out backwards' }}
-          >
-            {current.title}
-          </h2>
-
-          <p
-            key={`body-${step}`}
-            className="text-[14px] leading-relaxed text-[rgba(245,245,247,0.62)] max-w-[320px] mx-auto mb-8"
-            style={{ animation: 'onboardingFadeUp 400ms 120ms ease-out backwards' }}
-          >
-            {current.body}
-          </p>
-
-          <div className="flex items-center justify-center gap-1.5 mb-6">
-            {steps.map((_, i) => (
-              <span
-                key={i}
-                className="rounded-full transition-all duration-300"
-                style={{
-                  width: i === step ? 20 : 6,
-                  height: 6,
-                  background:
-                    i === step
-                      ? 'linear-gradient(90deg, #7c5cff, #ff6b9d)'
-                      : 'rgba(255,255,255,0.12)',
-                }}
-              />
-            ))}
-          </div>
-
+        {!isLast && (
           <button
             type="button"
-            onClick={handleNext}
-            className="group relative w-full h-12 rounded-xl overflow-hidden font-semibold text-[14px] text-white transition-all duration-300 active:scale-[0.98] cursor-pointer"
+            onClick={handleDismiss}
+            className="text-[13px] font-medium text-white/70 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-white/5 cursor-pointer"
+          >
+            Skip
+          </button>
+        )}
+      </header>
+
+      {/* Main content — bottom-left anchored */}
+      <main className="relative z-10 h-full flex flex-col justify-end pb-16 md:pb-24 px-6 md:px-12 lg:px-20">
+        <div className="max-w-2xl">
+          {slide.eyebrow && (
+            <div
+              key={`eyebrow-${slide.id}`}
+              className="flex items-center gap-2 mb-4"
+              style={{
+                animation:
+                  'slideFadeUp 600ms 80ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards',
+              }}
+            >
+              <span
+                className="text-[11px] md:text-[12px] font-bold tracking-[0.28em] uppercase"
+                style={{
+                  color: slide.accent,
+                  textShadow: `0 0 24px ${slide.accent}66`,
+                }}
+              >
+                {slide.eyebrow}
+              </span>
+            </div>
+          )}
+
+          <h1
+            key={`title-${slide.id}`}
+            className="text-[44px] md:text-[72px] lg:text-[88px] font-black leading-[0.95] tracking-[-0.03em] text-white mb-5"
             style={{
-              background: 'linear-gradient(135deg, #7c5cff 0%, #ff6b9d 100%)',
-              boxShadow: '0 8px 32px rgba(124,92,255,0.35)',
+              textShadow: '0 4px 32px rgba(0,0,0,0.8)',
+              animation:
+                'slideFadeUp 700ms 140ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards',
             }}
           >
-            <span
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-              style={{
-                background:
-                  'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)',
-                animation: 'onboardingSheen 1.2s ease-out',
-              }}
-            />
-            <span className="relative flex items-center justify-center gap-2">
-              {current.cta}
-              <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-            </span>
-          </button>
+            {slide.title}
+          </h1>
 
-          {!isLast && (
+          <p
+            key={`sub-${slide.id}`}
+            className="text-[15px] md:text-[18px] leading-relaxed text-white/80 max-w-xl mb-8"
+            style={{
+              textShadow: '0 2px 12px rgba(0,0,0,0.7)',
+              animation:
+                'slideFadeUp 700ms 220ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards',
+            }}
+          >
+            {slide.subtitle}
+          </p>
+
+          <div
+            key={`cta-${slide.id}`}
+            className="flex items-center gap-4"
+            style={{
+              animation:
+                'slideFadeUp 700ms 300ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards',
+            }}
+          >
             <button
               type="button"
-              onClick={handleDismiss}
-              className="mt-4 text-[12px] text-[rgba(245,245,247,0.4)] hover:text-[rgba(245,245,247,0.75)] transition-colors cursor-pointer"
+              onClick={goNext}
+              className="group relative inline-flex items-center gap-2 h-12 md:h-14 px-7 md:px-9 rounded-md font-semibold text-[15px] md:text-[17px] text-black bg-white hover:bg-white/90 transition-all duration-200 active:scale-[0.98] cursor-pointer"
+              style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
             >
-              Skip intro
+              <Play className="w-5 h-5 fill-black" strokeWidth={0} />
+              {slide.cta}
+              <ChevronRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-0.5" />
             </button>
-          )}
+
+            {step > 0 && (
+              <button
+                type="button"
+                onClick={goBack}
+                className="inline-flex items-center gap-2 h-12 md:h-14 px-6 rounded-md font-semibold text-[15px] md:text-[17px] text-white bg-white/15 hover:bg-white/25 backdrop-blur-sm transition-all duration-200 active:scale-[0.98] cursor-pointer"
+              >
+                Back
+              </button>
+            )}
+          </div>
+
+          {/* Segmented progress bar */}
+          <div className="flex items-center gap-2 mt-10 max-w-xs">
+            {SLIDES.map((s, i) => (
+              <button
+                key={s.id}
+                type="button"
+                aria-label={`Go to slide ${i + 1}`}
+                onClick={() => setStep(i)}
+                className="relative h-[3px] flex-1 rounded-full overflow-hidden cursor-pointer"
+                style={{ background: 'rgba(255,255,255,0.2)' }}
+              >
+                <span
+                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: i <= step ? '100%' : '0%',
+                    background: `linear-gradient(90deg, ${slide.accent}, #ffffff)`,
+                  }}
+                />
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </main>
+
+      <div
+        aria-hidden="true"
+        className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
+        style={{
+          background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)',
+        }}
+      />
 
       <style>{`
-        @keyframes onboardingFadeUp {
-          from { opacity: 0; transform: translateY(8px); }
+        @keyframes slideFadeUp {
+          from { opacity: 0; transform: translateY(24px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        @keyframes onboardingMascot {
-          0%, 100% { transform: translateY(0) scale(1); }
-          50%      { transform: translateY(-4px) scale(1.02); }
-        }
-        @keyframes onboardingFloatA {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50%      { transform: translate(30px, 20px) scale(1.1); }
-        }
-        @keyframes onboardingFloatB {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50%      { transform: translate(-30px, -20px) scale(1.08); }
-        }
-        @keyframes onboardingSheen {
-          from { transform: translateX(-100%); }
-          to   { transform: translateX(100%); }
-        }
         @media (prefers-reduced-motion: reduce) {
-          [class*="animation"], [style*="animation"] {
-            animation: none !important;
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
           }
         }
       `}</style>
