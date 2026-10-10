@@ -20,6 +20,7 @@ import { AmbientBackground } from './components/AmbientBackground';
 import { PageTransition } from './components/PageTransition';
 import { Onboarding } from './components/Onboarding';
 import { HoverPreview } from './components/HoverPreview';
+import { ScrollToTop } from './components/ScrollToTop';
 
 import { Home } from './pages/Home';
 import { MoviesPage } from './pages/MoviesPage';
@@ -158,6 +159,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+       <ScrollToTop />  
         <RouteSync />
         <HistoryRecorder />
         <AppLayout />
