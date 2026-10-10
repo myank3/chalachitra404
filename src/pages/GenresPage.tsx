@@ -1,21 +1,47 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getDiscoverMovies, getDiscoverTV, useMovieGenres, useTVGenres } from '../lib/api';
+import {
+  getDiscoverMovies,
+  getDiscoverTV,
+  useMovieGenres,
+  useTVGenres,
+} from '../lib/api';
 import { MovieCard } from '../components/MovieCard';
 import { LargeTitle } from '../components/ui/LargeTitle';
 import { MovieCardSkeleton } from '../components/ui/Skeleton';
 
 export const GenresPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [mediaType, setMediaType] = useState<'movie' | 'tv'>('movie');
   const [selectedGenreId, setSelectedGenreId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
 
   /* ---------- real TMDB genres ---------- */
-  const { data: movieGenres = [], isLoading: loadingMovieGenres } = useMovieGenres();
+  const { data: movieGenres = [], isLoading: loadingMovieGenres } =
+    useMovieGenres();
   const { data: tvGenres = [], isLoading: loadingTVGenres } = useTVGenres();
 
   const genres = mediaType === 'movie' ? movieGenres : tvGenres;
-  const loadingGenres = mediaType === 'movie' ? loadingMovieGenres : loadingTVGenres;
+  const loadingGenres =
+    mediaType === 'movie' ? loadingMovieGenres : loadingTVGenres;
+
+  /* ---------- read initial state from URL (once on mount) ---------- */
+  useEffect(() => {
+    const genreParam = searchParams.get('genre');
+    const typeParam = searchParams.get('type');
+
+    if (typeParam === 'movie' || typeParam === 'tv') {
+      setMediaType(typeParam);
+    }
+    if (genreParam) {
+      const num = Number(genreParam);
+      if (!Number.isNaN(num)) setSelectedGenreId(num);
+    }
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ---------- auto-select first genre ---------- */
   const activeGenreId = selectedGenreId ?? genres[0]?.id ?? null;
@@ -29,7 +55,7 @@ export const GenresPage: React.FC = () => {
         with_genres: activeGenreId!,
         page,
         sort_by: 'popularity.desc',
-        'vote_count.gte': 50, // filter noise
+        'vote_count.gte': 50,
       }),
     enabled: mediaType === 'movie' && activeGenreId !== null,
     staleTime: 1000 * 60 * 5,
@@ -50,26 +76,32 @@ export const GenresPage: React.FC = () => {
 
   /* ---------- normalize results with media_type guaranteed ---------- */
   const items = useMemo(() => {
-    const raw = mediaType === 'movie' ? movieData?.results ?? [] : tvData?.results ?? [];
+    const raw =
+      mediaType === 'movie' ? movieData?.results ?? [] : tvData?.results ?? [];
     return raw.map((it: any) => ({
       ...it,
-      media_type: mediaType, // ⭐ critical — discover endpoints omit this
+      media_type: mediaType,
       title: it.title || it.name || 'Untitled',
     }));
   }, [mediaType, movieData, tvData]);
 
-  const totalPages = mediaType === 'movie' ? movieData?.total_pages ?? 1 : tvData?.total_pages ?? 1;
+  const totalPages =
+    mediaType === 'movie' ? movieData?.total_pages ?? 1 : tvData?.total_pages ?? 1;
   const isLoading = mediaType === 'movie' ? loadingMovies : loadingTV;
 
-  /* ---------- reset page on genre/type change ---------- */
+  /* ---------- handlers — keep URL in sync ---------- */
   const handleGenreChange = (id: number) => {
     setSelectedGenreId(id);
     setPage(1);
+    setSearchParams({ genre: String(id), type: mediaType }, { replace: true });
   };
+
   const handleTypeChange = (t: 'movie' | 'tv') => {
     setMediaType(t);
     setSelectedGenreId(null);
     setPage(1);
+    // genre IDs differ between movie/tv — reset the URL param
+    setSearchParams({ type: t }, { replace: true });
   };
 
   return (
@@ -137,7 +169,8 @@ export const GenresPage: React.FC = () => {
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-[#f5f5f7] tracking-[-0.02em]">
-            {activeGenre?.name ?? 'All'} · {mediaType === 'movie' ? 'Movies' : 'Series'}
+            {activeGenre?.name ?? 'All'} ·{' '}
+            {mediaType === 'movie' ? 'Movies' : 'Series'}
           </h2>
           <span className="text-xs text-[rgba(245,245,247,0.45)] font-mono">
             {items.length} on this page
@@ -179,7 +212,9 @@ export const GenresPage: React.FC = () => {
                 <button
                   type="button"
                   disabled={page >= totalPages || page >= 500}
-                  onClick={() => setPage((p) => Math.min(totalPages, 500, p + 1))}
+                  onClick={() =>
+                    setPage((p) => Math.min(totalPages, 500, p + 1))
+                  }
                   className="px-4 py-2 rounded-xl bg-white/[0.05] border border-white/[0.1] text-xs font-medium text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.1] cursor-pointer transition-colors"
                 >
                   Next

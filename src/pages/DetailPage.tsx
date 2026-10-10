@@ -8,7 +8,14 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Play, Star, Video, ChevronDown, CheckCircle2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Play,
+  Star,
+  Video,
+  ChevronDown,
+  CheckCircle2,
+} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import {
   useDetails,
@@ -697,7 +704,7 @@ const PersonPopupBody: React.FC<{
 };
 
 /* ────────────────────────────────────────────────
-   Director chip
+   Director / Creator chip
    ──────────────────────────────────────────────── */
 const DirectorCard: React.FC<{ director: any }> = ({ director }) => {
   const [open, setOpen] = useState(false);
@@ -711,6 +718,9 @@ const DirectorCard: React.FC<{ director: any }> = ({ director }) => {
     gcTime: 1000 * 60 * 60 * 2,
   });
 
+  // ✅ Label reflects job — "Director" for movies, "Creator" for TV
+  const roleLabel = director.job ?? 'Director';
+
   return (
     <>
       <PersonStyles />
@@ -719,7 +729,7 @@ const DirectorCard: React.FC<{ director: any }> = ({ director }) => {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label={`Director ${director.name} — view details`}
+        aria-label={`${roleLabel} ${director.name} — view details`}
         className="group relative inline-flex items-center gap-2 pl-1 pr-3 py-0.5 rounded-full
                    bg-[#7c5cff]/15 hover:bg-[#7c5cff]/25
                    border border-[#7c5cff]/50 hover:border-[#7c5cff]/90
@@ -744,7 +754,7 @@ const DirectorCard: React.FC<{ director: any }> = ({ director }) => {
 
         <span className="flex flex-col items-start leading-tight">
           <span className="text-[8px] uppercase tracking-[0.12em] text-[#b8a4ff]/90 font-medium">
-            Director
+            {roleLabel}
           </span>
           <span className="dir-name text-[11px] font-semibold">
             {director.name}
@@ -760,7 +770,7 @@ const DirectorCard: React.FC<{ director: any }> = ({ director }) => {
         <PersonPopupBody
           person={data?.person ?? director}
           data={data}
-          listLabel="Directed"
+          listLabel={director.job === 'Creator' ? 'Created' : 'Directed'}
           isLoading={isLoading}
           variant="director"
         />
@@ -843,6 +853,9 @@ const CastCard: React.FC<{ actor: any }> = ({ actor }) => {
 /* ────────────────────────────────────────────────
    Genre chip
    ──────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────
+   Genre chip
+   ──────────────────────────────────────────────── */
 const GenreChip: React.FC<{
   genre: { id: number; name: string };
   type: MediaType;
@@ -851,7 +864,7 @@ const GenreChip: React.FC<{
   return (
     <button
       type="button"
-      onClick={() => navigate(`/genre/${genre.id}?type=${type}`)}
+      onClick={() => navigate(`/genres?genre=${genre.id}&type=${type}`)}
       className="px-2.5 py-1 rounded-md bg-white/[0.05] hover:bg-[#7c5cff]/20
                  border border-white/[0.08] hover:border-[#7c5cff]/50
                  text-xs text-[rgba(245,245,247,0.85)] hover:text-white
@@ -959,13 +972,36 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
     return null;
   }, [item]);
 
-  const primaryDirectors = useMemo(
-    () =>
-      ((item?.credits as any)?.crew ?? [])
-        .filter((c: any) => c.job === 'Director')
-        .slice(0, 3),
-    [item]
-  );
+  /* ✅ FIX: TV shows → created_by; Movies → Director from crew */
+  const primaryCredits = useMemo(() => {
+    if (!item) return [];
+
+    if (type === 'tv') {
+      const creators: any[] = (item as any).created_by ?? [];
+      if (creators.length > 0) {
+        return creators.slice(0, 3).map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          profile_path: c.profile_path,
+          job: 'Creator',
+        }));
+      }
+      // Fallback for older TV entries where created_by is empty
+      const tvCrew = ((item.credits as any)?.crew ?? []) as any[];
+      const fallback = tvCrew.filter(
+        (c) =>
+          c.job === 'Creator' ||
+          c.job === 'Executive Producer' ||
+          c.department === 'Writing'
+      );
+      return fallback.slice(0, 3).map((c) => ({ ...c, job: 'Creator' }));
+    }
+
+    // Movies → Director
+    return ((item?.credits as any)?.crew ?? [])
+      .filter((c: any) => c.job === 'Director')
+      .slice(0, 3);
+  }, [item, type]);
 
   const topCast = useMemo(
     () => ((item?.credits as any)?.cast ?? []).slice(0, 10),
@@ -1107,9 +1143,10 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                   </p>
                 )}
 
-                {primaryDirectors.length > 0 && (
+                {/* ✅ Renders Creator for TV, Director for movies */}
+                {primaryCredits.length > 0 && (
                   <div className="flex flex-wrap items-center gap-2 mb-3">
-                    {primaryDirectors.map((d: any) => (
+                    {primaryCredits.map((d: any) => (
                       <DirectorCard key={d.id} director={d} />
                     ))}
                   </div>
