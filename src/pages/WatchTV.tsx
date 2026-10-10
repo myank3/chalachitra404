@@ -8,15 +8,21 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useDetails, getImageUrl } from '../lib/api';
+import { useQuery } from '@tanstack/react-query';
+import {
+  useDetails,
+  getImageUrl,
+  TMDB_API_KEY,
+  TMDB_BASE_URL,
+} from '../lib/api';
 import { useImdbId } from '../hooks/useImdbId';
 import { useSeasonDetails } from '../hooks/useEpisodes';
 import { PROVIDERS, buildEmbedUrl } from '../lib/embedProviders';
 import { useWatchlist } from '../stores/watchlist';
 import { useUIStore } from '../stores/useUIStore';
-import { RecommendedRow } from '../components/RecommendedRow';
 import { recordWatched } from '../lib/recommend';
 import { Mascot } from '../components/Mascot';
 import { ServerDropdown } from '../components/ServerDropdown';
@@ -43,6 +49,163 @@ const PlayerFrame = memo(function PlayerFrame({
   );
 });
 
+/* ────────────────────────────────────────────────
+   Related fetch for TV:
+   TV has no collection concept in TMDB, so we
+   merge /recommendations + /similar.
+   ──────────────────────────────────────────────── */
+async function fetchRelatedTV(id: string): Promise<any[]> {
+  const u = (path: string, extra = '') =>
+    `${TMDB_BASE_URL}${path}?api_key=${TMDB_API_KEY}&language=en-US${extra}`;
+
+  try {
+    const [recRes, simRes] = await Promise.allSettled([
+      fetch(u(`/tv/${id}/recommendations`, '&page=1')),
+      fetch(u(`/tv/${id}/similar`, '&page=1')),
+    ]);
+
+    const a: any[] =
+      recRes.status === 'fulfilled' && recRes.value.ok
+        ? (await recRes.value.json()).results ?? []
+        : [];
+    const b: any[] =
+      simRes.status === 'fulfilled' && simRes.value.ok
+        ? (await simRes.value.json()).results ?? []
+        : [];
+
+    const seen = new Set<number>();
+    const merged: any[] = [];
+    for (const item of [...a, ...b]) {
+      if (!item?.id || seen.has(item.id)) continue;
+      seen.add(item.id);
+      merged.push(item);
+    }
+    return merged;
+  } catch {
+    return [];
+  }
+}
+
+/* ────────────────────────────────────────────────
+   Inline RelatedRow for TV shows
+   ──────────────────────────────────────────────── */
+const RelatedRow: React.FC<{
+  title: string;
+  subtitle?: string;
+  items: any[];
+}> = ({ title, subtitle, items }) => {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const amount = el.clientWidth * 0.8;
+    el.scrollBy({ left: dir === 'left' ? -amount : amount, behavior: 'smooth' });
+  };
+
+  if (!items || items.length === 0) return null;
+
+  return (
+    <section className="relative">
+      <div className="flex items-end justify-between mb-5 px-1">
+        <div>
+          {subtitle && (
+            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(245,245,247,0.35)] mb-1">
+              {subtitle}
+            </p>
+          )}
+          <h2 className="text-[22px] sm:text-[26px] font-semibold text-[#f5f5f7] tracking-[-0.02em]">
+            {title}
+          </h2>
+        </div>
+      </div>
+
+      <div className="relative group/row">
+        <div
+          className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity duration-200"
+          style={{ background: 'linear-gradient(90deg, #08080a 0%, transparent 100%)' }}
+        />
+        <div
+          className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity duration-200"
+          style={{ background: 'linear-gradient(270deg, #08080a 0%, transparent 100%)' }}
+        />
+
+        <button
+          onClick={() => scroll('left')}
+          aria-label="Scroll left"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer"
+        >
+          <ChevronRight className="w-5 h-5 rotate-180" strokeWidth={2} />
+        </button>
+        <button
+          onClick={() => scroll('right')}
+          aria-label="Scroll right"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer"
+        >
+          <ChevronRight className="w-5 h-5" strokeWidth={2} />
+        </button>
+
+        <div
+          ref={scrollerRef}
+          className="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-1"
+        >
+          {items.map((item, i) => (
+            <div
+              key={`${item.id}-${i}`}
+              className="w-[160px] sm:w-[180px] shrink-0"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `/tv/${item.id}`;
+                }}
+                className="group/card block w-full text-left cursor-pointer"
+              >
+                <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/[0.08] transition-[border-color,filter] duration-200 group-hover/card:brightness-125 group-hover/card:border-[rgba(124,92,255,0.45)]">
+                  {item.poster_path ? (
+                    <img
+                      src={`https://image.tmdb.org/t/p/w342${item.poster_path}`}
+                      alt={item.name || item.title}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center p-3 text-center bg-[#17171a]">
+                      <span className="text-[11px] text-white/50 line-clamp-3">
+                        {item.name || item.title}
+                      </span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent pointer-events-none" />
+                  {item.vote_average > 0 && (
+                    <div className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[11px] font-medium tabular-nums text-white px-2 py-0.5 rounded-md bg-black/85 border border-white/[0.08]">
+                      <span className="text-[#ffb347]">★</span>
+                      <span>{item.vote_average.toFixed(1)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2.5 px-0.5">
+                  <h3 className="text-[13px] font-medium text-[#f5f5f7] truncate leading-tight">
+                    {item.name || item.title || 'Untitled'}
+                  </h3>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[rgba(245,245,247,0.5)]">
+                    <span className="tabular-nums">
+                      {(item.first_air_date || '').slice(0, 4) || '—'}
+                    </span>
+                    <span className="text-white/20">·</span>
+                    <span className="uppercase tracking-wider text-[10px]">Series</span>
+                  </div>
+                </div>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 export const WatchTV: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,10 +221,17 @@ export const WatchTV: React.FC = () => {
   const { imdbId, loading: imdbLoading } = useImdbId(id || null, 'tv', show?.imdb_id);
   const { data: seasonData, isLoading: seasonLoading } = useSeasonDetails(id, currentSeason);
 
+  const { data: relatedShows = [] } = useQuery({
+    queryKey: ['related-tv', id],
+    queryFn: () => fetchRelatedTV(id!),
+    enabled: !!id && !!show,
+    staleTime: 1000 * 60 * 10,
+    retry: 1,
+  });
+
   const { has: isInWatchlist, toggle: toggleWatchlist } = useWatchlist();
   const { saveProgress } = useUIStore();
 
-  /* History — write to the store */
   const recordHistory = useWatchlist((s) => s.recordHistory);
 
   const [copied, setCopied] = useState(false);
@@ -100,7 +270,6 @@ export const WatchTV: React.FC = () => {
     setSearchParams({ s: String(newSeason), e: '1' });
   };
 
-  /* ---------- Record history when show / season / episode changes ---------- */
   useEffect(() => {
     if (!show || !id) return;
 
@@ -119,7 +288,6 @@ export const WatchTV: React.FC = () => {
     });
   }, [show, id, currentSeason, currentEpisode, recordHistory]);
 
-  /* ---------- 144Hz-smooth scroll to top (rAF) ---------- */
   const scrollToTop = () => {
     if (scrollRafRef.current !== null) {
       cancelAnimationFrame(scrollRafRef.current);
@@ -152,7 +320,6 @@ export const WatchTV: React.FC = () => {
     scrollRafRef.current = requestAnimationFrame(step);
   };
 
-  /* ---------- 144Hz-smooth scroll to episodes (rAF) ---------- */
   const scrollToEpisodes = () => {
     const el = episodesRef.current;
     if (!el) return;
@@ -284,6 +451,10 @@ export const WatchTV: React.FC = () => {
 
   const availableSeasons = (show?.seasons || []).filter((s) => s.season_number > 0);
   const episodesList = seasonData?.episodes || [];
+
+  const relatedItems = (relatedShows || [])
+    .filter((r: any) => r && r.id !== show?.id)
+    .slice(0, 20);
 
   return (
     <div className="min-h-screen text-[#f5f5f7] relative overflow-x-hidden bg-[#08080a]">
@@ -647,10 +818,14 @@ export const WatchTV: React.FC = () => {
           </div>
         )}
 
-        {/* 6. Recommendations */}
-        {show && (
-          <div className="animate-[fadeSlideUp_600ms_ease-out_300ms_both]">
-            <RecommendedRow sourceItem={show} />
+        {/* 6. Related Shows */}
+        {show && relatedItems.length > 0 && (
+          <div className="mt-14 animate-[fadeSlideUp_600ms_ease-out_300ms_both]">
+            <RelatedRow
+              title="Related Shows"
+              subtitle="More like this"
+              items={relatedItems}
+            />
           </div>
         )}
       </div>

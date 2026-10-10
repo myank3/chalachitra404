@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Play, Star, Video, ChevronDown, CheckCircle2 } from 'lucide-react';
-import { useDetails, useSimilar, getImageUrl } from '../lib/api';
+import { useQuery } from '@tanstack/react-query';
+import {
+  useDetails,
+  useSimilar,
+  getImageUrl,
+  TMDB_API_KEY,
+  TMDB_BASE_URL,
+} from '../lib/api';
 import { useSeasonDetails } from '../hooks/useEpisodes';
 import { useUIStore } from '../stores/useUIStore';
 import { WatchlistButton } from '../components/WatchlistButton';
@@ -11,6 +18,67 @@ import { Mascot } from '../components/Mascot';
 
 interface DetailPageProps {
   type?: MediaType;
+}
+
+/* ────────────────────────────────────────────────
+   Related fetch — collection-first for movies,
+   similar fallback for everything else.
+   ──────────────────────────────────────────────── */
+async function fetchRelated(
+  type: MediaType,
+  id: string,
+  collectionId?: number
+): Promise<any[]> {
+  const u = (path: string, extra = '') =>
+    `${TMDB_BASE_URL}${path}?api_key=${TMDB_API_KEY}&language=en-US${extra}`;
+
+  // Movies: try collection first
+  if (type === 'movie' && collectionId) {
+    try {
+      const res = await fetch(u(`/collection/${collectionId}`));
+      if (res.ok) {
+        const data = await res.json();
+        const parts = (data?.parts ?? [])
+          .filter((p: any) => p.id !== Number(id))
+          .sort(
+            (a: any, b: any) =>
+              new Date(a.release_date || 0).getTime() -
+              new Date(b.release_date || 0).getTime()
+          );
+        if (parts.length > 0) return parts;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  // Fallback — merge recommendations + similar
+  try {
+    const [recRes, simRes] = await Promise.allSettled([
+      fetch(u(`/${type}/${id}/recommendations`, '&page=1')),
+      fetch(u(`/${type}/${id}/similar`, '&page=1')),
+    ]);
+
+    const a: any[] =
+      recRes.status === 'fulfilled' && recRes.value.ok
+        ? (await recRes.value.json()).results ?? []
+        : [];
+    const b: any[] =
+      simRes.status === 'fulfilled' && simRes.value.ok
+        ? (await simRes.value.json()).results ?? []
+        : [];
+
+    const seen = new Set<number>();
+    const merged: any[] = [];
+    for (const item of [...a, ...b]) {
+      if (!item?.id || seen.has(item.id)) continue;
+      seen.add(item.id);
+      merged.push(item);
+    }
+    return merged;
+  } catch {
+    return [];
+  }
 }
 
 export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
@@ -26,12 +94,22 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
   const [showTrailer, setShowTrailer] = useState(false);
 
   const { data: item, isLoading } = useDetails(type, id || null);
-  const { data: similarItems = [] } = useSimilar(type, id || '');
 
   const { data: seasonData, isLoading: seasonLoading } = useSeasonDetails(
     type === 'tv' ? id : null,
     selectedSeason
   );
+
+  /* Related — collection-aware */
+  const collectionId = (item as any)?.belongs_to_collection?.id as number | undefined;
+
+  const { data: relatedItems = [] } = useQuery({
+    queryKey: ['related-detail', type, id, collectionId],
+    queryFn: () => fetchRelated(type, id!, collectionId),
+    enabled: !!id && !!item,
+    staleTime: 1000 * 60 * 10,
+    retry: 1,
+  });
 
   const loadProgress = (mediaId: string | number | undefined) => {
     if (!mediaId) return null;
@@ -90,7 +168,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
 
   /* ---------- Trailer sourcing: Vimeo first, YouTube fallback ---------- */
   const buildTrailer = (videos: any[] = []) => {
-    // Prefer Vimeo — cleaner embeds, no sign-in walls
     const vimeo =
       videos.find((v) => v.site === 'Vimeo' && v.type === 'Trailer') ??
       videos.find((v) => v.site === 'Vimeo' && v.type === 'Teaser') ??
@@ -107,7 +184,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
       };
     }
 
-    // Fall back to YouTube — prefer official trailers
     const yt =
       videos.find(
         (v) => v.site === 'YouTube' && v.type === 'Trailer' && v.official
@@ -134,6 +210,12 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
 
   const availableSeasons = (item.seasons || []).filter((s) => s.season_number > 0);
   const episodesList = seasonData?.episodes || [];
+
+  /* Normalize related items so the grid always gets media_type */
+  const relatedForGrid = (relatedItems || [])
+    .filter((r: any) => r && r.id !== item.id)
+    .map((r: any) => ({ ...r, media_type: type }))
+    .slice(0, 12);
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-[#f5f5f7] pb-24">
@@ -266,7 +348,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
             </div>
           </div>
 
-          {/* Embedded Trailer (Vimeo first, YouTube fallback) */}
+          {/* Embedded Trailer */}
           {showTrailer && trailer && (
             <div className="p-4 sm:p-6 border-t border-white/[0.08] bg-[#17171a]">
               <div className="flex items-center justify-between mb-3 text-[11px] text-[rgba(245,245,247,0.62)] font-medium uppercase tracking-[0.08em]">
@@ -297,7 +379,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                 />
               </div>
 
-              {/* Fallback link if the embed is blocked */}
               <div className="max-w-3xl mx-auto mt-3 text-center">
                 <a
                   href={trailer.externalUrl}
@@ -344,7 +425,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
               </div>
             </div>
 
-            {/* Top Cast */}
             {item.credits?.cast && item.credits.cast.length > 0 && (
               <div className="pt-4 border-t border-white/[0.08]">
                 <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)] mb-3">
@@ -524,29 +604,39 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
           </div>
         )}
 
-        {/* 4. Similar Items Section */}
-        {similarItems.length > 0 && (
+        {/* 4. Related Items Section — collection-aware for movies */}
+        {relatedForGrid.length > 0 && (
           <div className="mt-8 rounded-2xl bg-[#111113] border border-white/[0.08] p-6 sm:p-8">
             <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)] mb-4">
-              You May Also Like
+              {type === 'movie' && collectionId
+                ? 'More in this Collection'
+                : 'You May Also Like'}
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-              {similarItems.slice(0, 6).map((sim) => (
+              {relatedForGrid.slice(0, 6).map((sim) => (
                 <div
                   key={`${sim.media_type}-${sim.id}`}
-                  onClick={() => navigate(`/${sim.media_type || type}/${sim.id}`)}
+                  onClick={() =>
+                    navigate(`/${sim.media_type || type}/${sim.id}`)
+                  }
                   className="group cursor-pointer rounded-xl bg-[#17171a] p-2 border border-white/[0.08] hover:border-white/[0.18] transition-all"
                 >
                   <div className="aspect-[2/3] w-full rounded-lg overflow-hidden bg-neutral-900 mb-2">
-                    <img
-                      src={getImageUrl(sim.poster_path, 'w300')}
-                      alt={sim.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      referrerPolicy="no-referrer"
-                    />
+                    {sim.poster_path ? (
+                      <img
+                        src={getImageUrl(sim.poster_path, 'w300')}
+                        alt={sim.title || sim.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white/30 text-xs text-center p-2">
+                        {sim.title || sim.name}
+                      </div>
+                    )}
                   </div>
                   <p className="text-xs font-medium text-[rgba(245,245,247,0.85)] truncate group-hover:text-white">
-                    {sim.title}
+                    {sim.title || sim.name}
                   </p>
                   <span className="text-[10px] text-[rgba(245,245,247,0.4)]">
                     {sim.release_date

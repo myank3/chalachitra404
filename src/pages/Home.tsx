@@ -61,11 +61,11 @@ function readHistoryFromStorage(): HistoryItem[] {
    ──────────────────────────────────────────────── */
 const CONTAINER = 'max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8';
 
-/* ⭐ Hero timings — poster + content must finish together */
-const SLIDE_INTERVAL_MS = 6000;
-const SLIDE_FADE_MS = 1200;
-const CONTENT_EXIT_MS = 400;
-const CONTENT_ENTER_MS = 700;
+/* ⭐ Hero timings — snappier cadence */
+const SLIDE_INTERVAL_MS = 5500;
+const SLIDE_FADE_MS = 700;      // was 1200 — much faster crossfade
+const CONTENT_EXIT_MS = 220;    // was 400
+const CONTENT_ENTER_MS = 420;   // was 700
 
 /* ────────────────────────────────────────────────
    Hero
@@ -147,12 +147,13 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
               style={{
                 backgroundImage: `url(${bg})`,
                 opacity: isActive ? 1 : 0,
-                transition: `opacity ${SLIDE_FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                transition: `opacity ${SLIDE_FADE_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
                 animation: isActive
-                  ? `heroKenBurns ${SLIDE_INTERVAL_MS + SLIDE_FADE_MS}ms ease-out forwards`
+                  ? `heroKenBurns ${SLIDE_INTERVAL_MS + SLIDE_FADE_MS}ms linear forwards`
                   : 'none',
-                willChange: 'opacity, transform',
+                willChange: 'opacity',
                 backfaceVisibility: 'hidden',
+                transform: 'translateZ(0)',
               }}
             />
           );
@@ -181,11 +182,14 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
           <AnimatePresence mode="wait">
             <motion.div
               key={current.id}
-              initial={{ opacity: 0, y: 24, filter: 'blur(6px)' }}
+              initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: -16, filter: 'blur(6px)' }}
+              exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
               transition={{
-                duration: phase === 'exiting' ? CONTENT_EXIT_MS / 1000 : CONTENT_ENTER_MS / 1000,
+                duration:
+                  phase === 'exiting'
+                    ? CONTENT_EXIT_MS / 1000
+                    : CONTENT_ENTER_MS / 1000,
                 ease: [0.22, 1, 0.36, 1],
               }}
             >
@@ -202,9 +206,9 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
 
               {/* Title */}
               <motion.h1
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.4, delay: 0.03, ease: [0.22, 1, 0.36, 1] }}
                 className="text-[40px] sm:text-[52px] lg:text-[64px] font-bold text-white tracking-[-0.03em] leading-[0.95] mb-5"
               >
                 {title}
@@ -212,9 +216,9 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
 
               {/* Meta */}
               <motion.div
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.36, delay: 0.07, ease: [0.22, 1, 0.36, 1] }}
                 className="flex items-center flex-wrap gap-x-4 gap-y-1.5 mb-5 text-[13px] text-[rgba(245,245,247,0.7)]"
               >
                 {year && <span>{year}</span>}
@@ -240,9 +244,9 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
               {/* Overview */}
               {current.overview && (
                 <motion.p
-                  initial={{ opacity: 0, y: 16 }}
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.55, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: 0.36, delay: 0.11, ease: [0.22, 1, 0.36, 1] }}
                   className="text-[15px] leading-[1.65] text-[rgba(245,245,247,0.78)] max-w-[560px] mb-7 line-clamp-3"
                 >
                   {current.overview}
@@ -251,14 +255,14 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
 
               {/* Buttons */}
               <motion.div
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.26, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.36, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
                 className="flex items-center gap-3"
               >
                 <button
                   onClick={goToDetails}
-                  className="group inline-flex items-center gap-2 h-12 px-6 rounded-xl font-semibold text-[14px] text-black transition-all duration-300 active:scale-[0.97] cursor-pointer hover:-translate-y-0.5"
+                  className="group inline-flex items-center gap-2 h-12 px-6 rounded-xl font-semibold text-[14px] text-black transition-all duration-200 active:scale-[0.97] cursor-pointer hover:-translate-y-0.5"
                   style={{
                     background: '#ffffff',
                     boxShadow: '0 8px 32px rgba(255,255,255,0.15)',
@@ -270,7 +274,7 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
 
                 <button
                   onClick={goToDetails}
-                  className="inline-flex items-center gap-2 h-12 px-6 rounded-xl font-semibold text-[14px] text-white border border-white/[0.15] bg-white/[0.05] hover:bg-white/[0.1] backdrop-blur transition-all duration-300 active:scale-[0.97] cursor-pointer hover:-translate-y-0.5"
+                  className="inline-flex items-center gap-2 h-12 px-6 rounded-xl font-semibold text-[14px] text-white border border-white/[0.15] bg-white/[0.05] hover:bg-white/[0.1] backdrop-blur transition-all duration-200 active:scale-[0.97] cursor-pointer hover:-translate-y-0.5"
                 >
                   <Info className="w-4 h-4" strokeWidth={2} />
                   <span>More Info</span>
@@ -290,7 +294,7 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
                 key={i}
                 onClick={() => goToSlide(i)}
                 aria-label={`Slide ${i + 1}`}
-                className="relative h-1 rounded-full overflow-hidden transition-all duration-500 cursor-pointer"
+                className="relative h-1 rounded-full overflow-hidden transition-all duration-300 cursor-pointer"
                 style={{
                   width: i === index ? 40 : 8,
                   background:
@@ -317,8 +321,8 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
 
       <style>{`
         @keyframes heroKenBurns {
-          from { transform: scale(1.02) translate(0, 0); }
-          to   { transform: scale(1.10) translate(-1%, -1%); }
+          from { transform: scale(1.03) translate(0, 0); }
+          to   { transform: scale(1.08) translate(-0.8%, -0.8%); }
         }
         @keyframes heroProgress {
           from { width: 0%; }
@@ -377,18 +381,18 @@ const Row: React.FC<{
 
       <div className="relative group/row">
         <div
-          className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity"
+          className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity duration-200"
           style={{ background: 'linear-gradient(90deg, #0a0a0b 0%, transparent 100%)' }}
         />
         <div
-          className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity"
+          className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity duration-200"
           style={{ background: 'linear-gradient(270deg, #0a0a0b 0%, transparent 100%)' }}
         />
 
         <button
           onClick={() => scroll('left')}
           aria-label="Scroll left"
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-300 cursor-pointer"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer"
         >
           <ChevronRight className="w-5 h-5 rotate-180" strokeWidth={2} />
         </button>
@@ -396,7 +400,7 @@ const Row: React.FC<{
         <button
           onClick={() => scroll('right')}
           aria-label="Scroll right"
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-300 cursor-pointer"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer"
         >
           <ChevronRight className="w-5 h-5" strokeWidth={2} />
         </button>
@@ -433,7 +437,7 @@ const ContinueCard: React.FC<{ item: HistoryItem }> = ({ item }) => {
         if (item.type === 'movie') navigate(`/movie/${item.id}`);
         else navigate(`/tv/${item.id}`);
       }}
-      className="group relative cursor-pointer rounded-2xl bg-[#111113] border border-white/[0.08] hover:border-[rgba(124,92,255,0.4)] hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+      className="group relative cursor-pointer rounded-2xl bg-[#111113] border border-white/[0.08] hover:border-[rgba(124,92,255,0.4)] hover:-translate-y-1 transition-all duration-200 overflow-hidden"
     >
       <div className="relative aspect-video overflow-hidden">
         {backdrop ? (
@@ -442,12 +446,12 @@ const ContinueCard: React.FC<{ item: HistoryItem }> = ({ item }) => {
             alt={item.title}
             loading="lazy"
             decoding="async"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="w-full h-full bg-[#0a0a0b]" />
         )}
-        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <div className="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center shadow-lg">
             <Play className="w-4 h-4 fill-current ml-0.5" strokeWidth={0} />
           </div>
@@ -473,7 +477,7 @@ const ContinueCard: React.FC<{ item: HistoryItem }> = ({ item }) => {
               : `${Math.round(progressPct)}% watched`}
           </p>
         </div>
-        <span className="text-[11px] font-medium text-[rgba(245,245,247,0.55)] group-hover:text-[#7c5cff] transition-colors shrink-0 mt-0.5">
+        <span className="text-[11px] font-medium text-[rgba(245,245,247,0.55)] group-hover:text-[#7c5cff] transition-colors duration-200 shrink-0 mt-0.5">
           Resume
         </span>
       </div>
@@ -520,18 +524,18 @@ const ContinueWatchingRow: React.FC<{ items: HistoryItem[]; total: number }> = (
 
       <div className="relative group/row">
         <div
-          className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity"
+          className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity duration-200"
           style={{ background: 'linear-gradient(90deg, #0a0a0b 0%, transparent 100%)' }}
         />
         <div
-          className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity"
+          className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none opacity-0 group-hover/row:opacity-100 transition-opacity duration-200"
           style={{ background: 'linear-gradient(270deg, #0a0a0b 0%, transparent 100%)' }}
         />
 
         <button
           onClick={() => scroll('left')}
           aria-label="Scroll left"
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-300 cursor-pointer"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer"
         >
           <ChevronRight className="w-5 h-5 rotate-180" strokeWidth={2} />
         </button>
@@ -539,7 +543,7 @@ const ContinueWatchingRow: React.FC<{ items: HistoryItem[]; total: number }> = (
         <button
           onClick={() => scroll('right')}
           aria-label="Scroll right"
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-300 cursor-pointer"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer"
         >
           <ChevronRight className="w-5 h-5" strokeWidth={2} />
         </button>

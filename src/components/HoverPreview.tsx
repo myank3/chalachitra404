@@ -3,19 +3,34 @@ import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
-import { Play, Plus, Check, ThumbsUp, ChevronDown, Volume2, VolumeX } from 'lucide-react';
 import { getImageUrl, getDetails } from '../lib/api';
 import { useHoverPreview } from '../stores/hoverPreview';
-import { useWatchlist } from '../stores/watchlist';
 
-const PREVIEW_W = 380;
-const PREVIEW_H = 380;
+const PREVIEW_W = 360;
+const PREVIEW_H = 340;
 const SHOW_DELAY_MS = 0;
 const HIDE_GRACE_MS = 80;
 const GAP = 10;
 const EDGE_PAD = 8;
 
 type Side = 'top' | 'bottom' | 'left' | 'right';
+
+/* -------- Global preconnect: fires once at module load -------- */
+if (typeof document !== 'undefined') {
+  const origins = [
+    'https://www.youtube.com',
+    'https://www.youtube-nocookie.com',
+    'https://i.ytimg.com',
+    'https://googlevideo.com',
+  ];
+  origins.forEach((href) => {
+    const link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.href = href;
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+  });
+}
 
 export const HoverPreview: React.FC = () => {
   const item = useHoverPreview((s) => s.item);
@@ -24,8 +39,6 @@ export const HoverPreview: React.FC = () => {
 
   const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [playing, setPlaying] = useState(true);
   const [coords, setCoords] = useState({ left: 0, top: 0 });
   const [side, setSide] = useState<Side>('right');
 
@@ -35,76 +48,68 @@ export const HoverPreview: React.FC = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const scrollRafRef = useRef<number | null>(null);
   const isScrollingRef = useRef(false);
-  const playerReadyRef = useRef(false);
 
-  const inList = useWatchlist((s) =>
-    item ? Boolean(s.items[`${item.media_type}-${item.id}`]) : false
-  );
-  const toggle = useWatchlist((s) => s.toggle);
-
+  /* ---------- Details query — only when the preview is visible ---------- */
   const { data: details } = useQuery({
     queryKey: ['hover-trailer', item?.media_type, item?.id],
     queryFn: () => getDetails(item!.media_type as any, item!.id),
-    enabled: !!item,
+    enabled: !!item && visible,
     staleTime: 1000 * 60 * 10,
   });
 
   const videos = (details?.videos?.results ?? []).filter(
-    (v: any) => v.site === 'YouTube' || v.site === 'Vimeo'
+    (v: any) => v.site === 'YouTube'
   );
 
-  const vimeo = videos.find(
-    (v: any) => v.site === 'Vimeo' && (v.type === 'Trailer' || v.type === 'Teaser')
-  );
   const yt =
-    videos.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ??
-    videos.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer') ??
-    videos.find((v: any) => v.site === 'YouTube' && v.type === 'Teaser') ??
-    videos.find((v: any) => v.site === 'YouTube');
+    videos.find((v: any) => v.type === 'Trailer' && v.official) ??
+    videos.find((v: any) => v.type === 'Trailer') ??
+    videos.find((v: any) => v.type === 'Teaser') ??
+    videos[0];
 
-  const trailerSrc = vimeo
-    ? `https://player.vimeo.com/video/${vimeo.key}?autoplay=1&muted=0&loop=1&background=1&playsinline=1`
-    : yt
-    ? `https://www.youtube-nocookie.com/embed/${yt.key}?autoplay=1&mute=0&controls=0&modestbranding=1&loop=1&playlist=${yt.key}&playsinline=1&rel=0&disablekb=1&fs=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+  // Fast-loading YouTube embed:
+  // - mute=1 → guaranteed autoplay (no browser block)
+  // - controls=0, modestbranding=1 → minimal chrome
+  // - rel=0, disablekb=1, fs=0 → no extra UI
+  // - playsinline=1 → inline on mobile
+  // - iv_load_policy=3 → no annotations
+  // - enablejsapi=1 → lets us unmute + nudge playback via postMessage
+  // - origin + widget_referrer → keeps YouTube's internal checks happy
+  const trailerSrc = yt
+    ? `https://www.youtube-nocookie.com/embed/${yt.key}` +
+      `?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${yt.key}` +
+      `&playsinline=1&rel=0&disablekb=1&fs=0&iv_load_policy=3&enablejsapi=1` +
+      `&origin=${encodeURIComponent(window.location.origin)}` +
+      `&widget_referrer=${encodeURIComponent(window.location.origin)}`
     : null;
 
-  /* ---------- Post message to iframe with retry ---------- */
+  /* ---------- Post message to YouTube ---------- */
   const postCmd = (func: string, args?: any[]) => {
     const iframe = iframeRef.current;
     if (!iframe) return;
-    const targetOrigin = vimeo
-      ? 'https://player.vimeo.com'
-      : 'https://www.youtube-nocookie.com';
     try {
       iframe.contentWindow?.postMessage(
         JSON.stringify({ event: 'command', func, args: args ?? [] }),
-        targetOrigin
+        'https://www.youtube-nocookie.com'
       );
     } catch {}
   };
 
-  /* ---------- Force PLAY on mount + retries ---------- */
+  /* ---------- Force play + unmute with retries ---------- */
   useEffect(() => {
     if (!trailerSrc) return;
-    playerReadyRef.current = false;
 
-    const playCommands = [
-      () => postCmd('playVideo'),
-      () => postCmd('unMute'),
-      () => postCmd('setVolume', [100]),
-    ];
-
-    // Burst — YouTube's embed API isn't ready instantly
     const fire = () => {
-      playCommands.forEach((fn) => fn());
-      playerReadyRef.current = true;
+      postCmd('playVideo');
+      postCmd('unMute');
+      postCmd('setVolume', [100]);
+       postCmd('unloadModule', ['captions']); // ← this kills captions
+  postCmd('unloadModule', ['cc']);  
     };
 
     fire();
-    const fast = window.setInterval(fire, 200);
-    const stopFast = window.setTimeout(() => window.clearInterval(fast), 1500);
-
-    // Slow heartbeat to keep it playing through loops
+    const fast = window.setInterval(fire, 120);
+    const stopFast = window.setTimeout(() => window.clearInterval(fast), 1200);
     const slow = window.setInterval(fire, 2000);
 
     return () => {
@@ -113,30 +118,7 @@ export const HoverPreview: React.FC = () => {
       window.clearTimeout(stopFast);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trailerSrc, vimeo]);
-
-  /* ---------- Mute toggle side-effect ---------- */
-  useEffect(() => {
-    if (!trailerSrc) return;
-    if (muted) {
-      postCmd('mute');
-    } else {
-      postCmd('unMute');
-      postCmd('setVolume', [100]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [muted, trailerSrc]);
-
-  /* ---------- Play/Pause toggle side-effect ---------- */
-  useEffect(() => {
-    if (!trailerSrc) return;
-    if (playing) {
-      postCmd('playVideo');
-    } else {
-      postCmd('pauseVideo');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, trailerSrc]);
+  }, [trailerSrc]);
 
   /* ---------- Fast scroll detection ---------- */
   useEffect(() => {
@@ -154,12 +136,11 @@ export const HoverPreview: React.FC = () => {
     };
   }, []);
 
-  /* ---------- Instant show ---------- */
+  /* ---------- Show / hide ---------- */
   useEffect(() => {
     if (showTimerRef.current) window.clearTimeout(showTimerRef.current);
     if (item && anchorRect && !isScrollingRef.current) {
       showTimerRef.current = window.setTimeout(() => {
-        setPlaying(true);
         setVisible(true);
       }, SHOW_DELAY_MS);
     } else {
@@ -358,6 +339,7 @@ export const HoverPreview: React.FC = () => {
             duration: 0.14,
             ease: [0.22, 1, 0.36, 1],
           }}
+          onClick={goToDetails}
           style={{
             position: 'fixed',
             left: coords.left,
@@ -369,9 +351,9 @@ export const HoverPreview: React.FC = () => {
             willChange: 'transform, opacity',
             backfaceVisibility: 'hidden',
             contain: 'layout paint style',
+            cursor: 'pointer',
           }}
           className="
-            pointer-events-auto
             rounded-md overflow-hidden
             bg-[#181818]
             shadow-[0_20px_60px_-12px_rgba(0,0,0,0.95)]
@@ -395,122 +377,18 @@ export const HoverPreview: React.FC = () => {
                 src={trailerSrc}
                 title={`${title} trailer`}
                 className="absolute inset-0 w-full h-full border-0"
-                allow="autoplay; encrypted-media; picture-in-picture"
-                referrerPolicy="strict-origin-when-cross-origin"
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                 allowFullScreen={false}
                 style={{ pointerEvents: 'none' }}
               />
             )}
 
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#181818] via-[#181818]/70 to-transparent pointer-events-none" />
-
-            {/* Control cluster — play + mute */}
-            {trailerSrc && (
-              <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
-                {/* Force Play / Pause */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPlaying((p) => !p);
-                  }}
-                  aria-label={playing ? 'Pause' : 'Play'}
-                  title={playing ? 'Pause' : 'Play'}
-                  className="w-8 h-8 rounded-full bg-black/50 hover:bg-black/80 border border-white/25 flex items-center justify-center text-white/90 hover:text-white transition-colors cursor-pointer"
-                >
-                  {playing ? (
-                    // Pause icon (two bars)
-                    <svg
-                      className="w-3.5 h-3.5"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <rect x="6" y="5" width="4" height="14" rx="1" />
-                      <rect x="14" y="5" width="4" height="14" rx="1" />
-                    </svg>
-                  ) : (
-                    <Play className="w-3.5 h-3.5 fill-current ml-0.5" strokeWidth={0} />
-                  )}
-                </button>
-
-                {/* Mute toggle */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMuted((m) => !m);
-                  }}
-                  aria-label={muted ? 'Unmute' : 'Mute'}
-                  title={muted ? 'Unmute' : 'Mute'}
-                  className="w-8 h-8 rounded-full bg-black/50 hover:bg-black/80 border border-white/25 flex items-center justify-center text-white/90 hover:text-white transition-colors cursor-pointer"
-                >
-                  {muted ? (
-                    <VolumeX className="w-3.5 h-3.5" strokeWidth={2.2} />
-                  ) : (
-                    <Volume2 className="w-3.5 h-3.5" strokeWidth={2.2} />
-                  )}
-                </button>
-              </div>
-            )}
           </div>
 
           {/* ---- Info area ---- */}
-          <div className="px-4 pt-3 pb-4">
-            <div className="flex items-center gap-2 mb-3">
-              <button
-                type="button"
-                onClick={goToDetails}
-                aria-label="Play"
-                className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center hover:bg-white/85 transition-colors cursor-pointer"
-              >
-                <Play className="w-4 h-4 fill-current ml-0.5" strokeWidth={0} />
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggle({
-                    id: item.id,
-                    type: item.media_type,
-                    title,
-                    posterPath: item.poster_path,
-                    backdropPath: item.backdrop_path,
-                    year,
-                    rating: item.vote_average,
-                    overview: item.overview,
-                  });
-                }}
-                aria-label={inList ? 'Remove from list' : 'Add to list'}
-                className="w-9 h-9 rounded-full border border-white/40 bg-black/40 flex items-center justify-center text-white hover:border-white hover:bg-black/70 transition-colors cursor-pointer"
-              >
-                {inList ? (
-                  <Check className="w-4 h-4" strokeWidth={2.5} />
-                ) : (
-                  <Plus className="w-4 h-4" strokeWidth={2.2} />
-                )}
-              </button>
-
-              <button
-                type="button"
-                aria-label="Like"
-                onClick={(e) => e.stopPropagation()}
-                className="w-9 h-9 rounded-full border border-white/40 bg-black/40 flex items-center justify-center text-white hover:border-white hover:bg-black/70 transition-colors cursor-pointer"
-              >
-                <ThumbsUp className="w-3.5 h-3.5" strokeWidth={2.2} />
-              </button>
-
-              <button
-                type="button"
-                onClick={goToDetails}
-                aria-label="More info"
-                className="ml-auto w-9 h-9 rounded-full border border-white/40 bg-black/40 flex items-center justify-center text-white hover:border-white hover:bg-black/70 transition-colors cursor-pointer"
-              >
-                <ChevronDown className="w-4 h-4" strokeWidth={2.2} />
-              </button>
-            </div>
-
-            <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-[12px] text-white/70 mb-2">
+          <div className="px-4 pt-2.5 pb-3">
+            <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-[12px] text-white/70 mb-1.5">
               <span className="text-emerald-400 font-semibold">{matchPct}% Match</span>
               <span className="px-1 py-px border border-white/40 text-[10px] font-medium text-white/80">
                 {maturity}
@@ -520,12 +398,12 @@ export const HoverPreview: React.FC = () => {
             </div>
 
             {genreNames && (
-              <p className="text-[12px] text-white/60 mb-3 truncate">
+              <p className="text-[12px] text-white/60 mb-1.5 truncate">
                 {genreNames}
               </p>
             )}
 
-            <h3 className="text-[15px] font-semibold text-white leading-snug line-clamp-2">
+            <h3 className="text-[15px] font-semibold text-white leading-snug line-clamp-1">
               {title}
             </h3>
           </div>

@@ -15,6 +15,37 @@ export const Footer: React.FC = () => {
     });
   };
 
+  /* ── Retry-aware navigation for My List ──
+     If the route doesn't land on the first attempt (lazy chunk still loading,
+     race with route transitions, or navigation swallowed), this fires up to
+     three retries and always ends with the correct path landed + scrolled. */
+  const goWithRetry = (path: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3;
+
+    const attempt = () => {
+      attempts += 1;
+      try {
+        navigate(path);
+      } catch {
+        // swallow — retried below
+      }
+
+      // Verify we landed; if not, retry
+      window.setTimeout(() => {
+        if (window.location.pathname !== path && attempts < MAX_ATTEMPTS) {
+          attempt();
+        } else {
+          window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+        }
+      }, 160);
+    };
+
+    attempt();
+  };
+
   return (
     <footer className="relative mt-20 text-[#f5f5f7] overflow-hidden">
       {/* ═══════════════════════════════════════════════
@@ -28,7 +59,6 @@ export const Footer: React.FC = () => {
         }}
         aria-hidden="true"
       >
-        {/* warm key light */}
         <div
           className="absolute -top-16 -left-16 w-56 h-56 rounded-full pointer-events-none"
           style={{
@@ -37,7 +67,6 @@ export const Footer: React.FC = () => {
             filter: 'blur(20px)',
           }}
         />
-        {/* menacing red glow from behind the bull */}
         <div
           className="absolute -bottom-20 left-1/4 w-72 h-72 rounded-full pointer-events-none"
           style={{
@@ -47,7 +76,6 @@ export const Footer: React.FC = () => {
           }}
         />
 
-        {/* dust */}
         {Array.from({ length: 10 }).map((_, i) => (
           <span
             key={i}
@@ -67,7 +95,6 @@ export const Footer: React.FC = () => {
           />
         ))}
 
-        {/* floor line */}
         <div
           className="absolute left-0 right-0 bottom-3 h-px"
           style={{
@@ -76,7 +103,6 @@ export const Footer: React.FC = () => {
           }}
         />
 
-        {/* the chase */}
         <div
           className="absolute bottom-3 left-0"
           style={{ animation: 'runAcross 15s linear infinite' }}
@@ -89,7 +115,6 @@ export const Footer: React.FC = () => {
           </div>
         </div>
 
-        {/* edge fades */}
         <div
           className="absolute inset-y-0 left-0 w-12 sm:w-20 pointer-events-none z-10"
           style={{
@@ -151,7 +176,7 @@ export const Footer: React.FC = () => {
                 <li className="relative">
                   <button
                     type="button"
-                    onClick={go('/my-list')}
+                    onClick={goWithRetry('/my-list')}
                     className="group relative w-full text-left inline-flex items-center justify-between gap-3 px-2.5 py-2 -mx-2.5 rounded-lg text-[#f5f5f7] hover:bg-[rgba(124,92,255,0.10)] transition-all duration-200 cursor-pointer"
                   >
                     <span className="relative inline-flex items-center gap-2">
@@ -275,7 +300,6 @@ export const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Bottom bar — bull logo replaces mascot */}
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[rgba(245,245,247,0.38)]">
             <div className="flex items-center gap-2 tracking-wide">
               <BullLogo size={26} />
@@ -398,7 +422,6 @@ export const Footer: React.FC = () => {
           100% { transform: translateY(0); }
         }
 
-        /* ── BULL LEGS — heavier, wider stride ── */
         @keyframes bullFrontThigh {
           0%   { transform: rotate(-46deg); }
           15%  { transform: rotate(-34deg); }
@@ -440,7 +463,6 @@ export const Footer: React.FC = () => {
           100% { transform: rotate(88deg); }
         }
 
-        /* ── BULL BODY — heavier arc ── */
         @keyframes bullArc {
           0%   { transform: translateY(0); }
           15%  { transform: translateY(2.6px); }
@@ -459,11 +481,6 @@ export const Footer: React.FC = () => {
         @keyframes bullHead {
           0%, 100% { transform: translateY(0) rotate(-3deg); }
           50%      { transform: translateY(-0.8px) rotate(3deg); }
-        }
-        /* shoulder muscle swells as he runs */
-        @keyframes shoulderSwell {
-          0%, 100% { transform: scale(1); }
-          50%      { transform: scale(1.05); }
         }
         @keyframes hoofDust {
           0%   { transform: translate(0, 0) scale(0.4); opacity: 0; }
@@ -497,7 +514,7 @@ export const Footer: React.FC = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   THE RUNNER — unchanged, sunglasses intact
+   THE RUNNER
    ═══════════════════════════════════════════════════════════════════ */
 const Runner: React.FC = () => {
   const C = '0.42s';
@@ -574,7 +591,6 @@ const Runner: React.FC = () => {
               <rect x="-5.5" y="-5.2" width="11.5" height="1.4" rx="0.6" fill={HOT} />
               <path d="M-5 -3.5 A5 5 0 0 1 5 -3.5" fill="none" stroke={DARK} strokeWidth="1.2" />
               <circle cx="-5" cy="-2.5" r="1.5" fill={HOT} />
-              {/* sunglasses */}
               <rect x="-2" y="-2.4" width="6.4" height="3" rx="0.9" fill={LENS} />
               <rect x="-1.4" y="-2" width="2.4" height="0.8" rx="0.4" fill="#ffffff" opacity="0.28" />
               <line x1="-2.4" y1="-2.6" x2="4.7" y2="-2.6" stroke={FRAME} strokeWidth="0.5" strokeLinecap="round" />
@@ -643,22 +659,20 @@ const Runner: React.FC = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   THE BULL — muscular, menacing
-   Bigger body, visible muscle anatomy, red eye, slavering muzzle,
-   steam from nostrils, heavier gallop.
+   THE BULL — proper bull: wide-set horns, broad muzzle, angry brow,
+   heavy front quarter, narrow haunches.
    ═══════════════════════════════════════════════════════════════════ */
 const Bull: React.FC = () => {
   const C = '0.42s';
   const EASE = 'cubic-bezier(0.4, 0, 0.6, 1)';
 
-  // Palette — deep charcoal hide with warm underlighting
-  const HIDE = '#231620';
   const HIDE_DARK = '#160d14';
   const HIDE_MID = '#2e1c28';
   const HIDE_LIGHT = '#3e2634';
   const MUSCLE_SHADOW = '#0f070d';
   const MUSCLE_HI = '#4a2e3c';
   const HORN = '#e8dcc0';
+  const HORN_TIP = '#f5ecd6';
   const HORN_SHADOW = '#a89878';
   const HOOF = '#08050a';
   const EYE = '#ff2a2a';
@@ -666,26 +680,24 @@ const Bull: React.FC = () => {
   const RIM = '#ffb47a';
   const STEAM = 'rgba(255,255,255,0.35)';
   const SLOBBER = '#c8b0a0';
+  const NOSE = '#1a0f18';
 
   return (
     <svg
-      width="92"
-      height="52"
-      viewBox="0 0 92 52"
+      width="100"
+      height="56"
+      viewBox="0 0 100 56"
       style={{ display: 'block', overflow: 'visible' }}
     >
-      {/* ground shadow — bigger, softer */}
-      <g transform="translate(46, 48)">
+      <g transform="translate(50, 52)">
         <g style={{ animation: `bullArc ${C} ${EASE} infinite` }}>
-          <ellipse cx="0" cy="0" rx="20" ry="2.4" fill="#000" opacity="0.45" />
+          <ellipse cx="0" cy="0" rx="22" ry="2.6" fill="#000" opacity="0.45" />
         </g>
       </g>
 
       <g style={{ animation: `bullArc ${C} ${EASE} infinite` }}>
-        {/* ═══════════════════════════════════════════════
-            BACK LEGS (far side)
-            ═══════════════════════════════════════════════ */}
-        <g transform="translate(24, 34)">
+        {/* BACK LEGS */}
+        <g transform="translate(26, 38)">
           <g style={{ transformOrigin: '0px 0px', animation: `bullBackThigh ${C} ${EASE} infinite` }}>
             <line x1="0" y1="0" x2="0" y2="8" stroke={HIDE_DARK} strokeWidth="5" strokeLinecap="round" />
             <g transform="translate(0, 8)">
@@ -696,7 +708,7 @@ const Bull: React.FC = () => {
             </g>
           </g>
         </g>
-        <g transform="translate(64, 34)">
+        <g transform="translate(70, 38)">
           <g style={{ transformOrigin: '0px 0px', animation: `bullFrontThigh ${C} ${EASE} infinite` }}>
             <line x1="0" y1="0" x2="0" y2="8" stroke={HIDE_DARK} strokeWidth="5" strokeLinecap="round" />
             <g transform="translate(0, 8)">
@@ -708,39 +720,27 @@ const Bull: React.FC = () => {
           </g>
         </g>
 
-        {/* ═══════════════════════════════════════════════
-            TAIL — whips hard
-            ═══════════════════════════════════════════════ */}
-        <g transform="translate(14, 20)">
+        {/* TAIL */}
+        <g transform="translate(14, 22)">
           <g style={{ transformOrigin: '0px 0px', animation: `tailWhip ${C} ${EASE} infinite` }}>
-            <path
-              d="M0 0 Q-6 10 -4 18"
-              stroke={HIDE_DARK}
-              strokeWidth="2.4"
-              fill="none"
-              strokeLinecap="round"
-            />
+            <path d="M0 0 Q-6 10 -4 18" stroke={HIDE_DARK} strokeWidth="2.4" fill="none" strokeLinecap="round" />
             <ellipse cx="-4" cy="19" rx="2.4" ry="3.2" fill={HIDE_DARK} />
             <ellipse cx="-4.3" cy="18.2" rx="1.2" ry="1.6" fill={HIDE_MID} opacity="0.5" />
           </g>
         </g>
 
-        {/* ═══════════════════════════════════════════════
-            BODY — massive, muscular silhouette
-            Broad chest tapering to a narrower haunch,
-            pronounced shoulder hump.
-            ═══════════════════════════════════════════════ */}
+        {/* BODY */}
         <path
           d="
-            M14 20
-            Q14 12 24 10
-            L60 9
-            Q70 10 74 16
-            Q78 20 78 26
-            L78 30
-            Q78 36 70 36
-            L22 36
-            Q14 35 14 28
+            M16 22
+            Q14 14 22 11
+            Q34 8 48 9
+            Q62 9 72 12
+            Q82 14 84 22
+            Q86 28 84 33
+            Q82 39 74 39
+            L24 39
+            Q16 38 16 30
             Z
           "
           fill={HIDE_MID}
@@ -748,248 +748,150 @@ const Bull: React.FC = () => {
           strokeWidth="0.7"
         />
 
-        {/* chest muscle mass — bigger than the haunch */}
+        {/* shoulder hump — bull signature */}
         <path
-          d="M60 10 Q74 12 78 24 Q76 32 66 34 Q66 20 60 10 Z"
+          d="M52 9 Q66 8 76 12 Q80 16 80 22 Q74 18 62 17 Q54 17 48 19 Q48 12 52 9 Z"
           fill={HIDE_LIGHT}
-          opacity="0.75"
+          opacity="0.85"
         />
 
-        {/* shoulder hump shadow — sells the muscle */}
+        {/* chest mass */}
         <path
-          d="M30 10 Q44 8 58 10 Q54 20 48 22 Q38 22 30 10 Z"
+          d="M68 13 Q82 16 84 26 Q82 36 72 38 Q74 24 68 13 Z"
+          fill={HIDE_LIGHT}
+          opacity="0.7"
+        />
+
+        {/* shoulder shadow */}
+        <path
+          d="M32 11 Q46 9 60 11 Q56 20 50 22 Q40 22 32 11 Z"
           fill={MUSCLE_SHADOW}
           opacity="0.55"
         />
 
-        {/* visible rib shading on the flank */}
-        <path d="M34 18 Q40 20 44 24" stroke={MUSCLE_SHADOW} strokeWidth="0.7" fill="none" opacity="0.5" />
-        <path d="M36 22 Q42 24 46 28" stroke={MUSCLE_SHADOW} strokeWidth="0.7" fill="none" opacity="0.45" />
-        <path d="M38 26 Q44 28 48 31" stroke={MUSCLE_SHADOW} strokeWidth="0.7" fill="none" opacity="0.4" />
+        {/* rib shading */}
+        <path d="M34 20 Q40 22 44 26" stroke={MUSCLE_SHADOW} strokeWidth="0.7" fill="none" opacity="0.5" />
+        <path d="M36 24 Q42 26 46 30" stroke={MUSCLE_SHADOW} strokeWidth="0.7" fill="none" opacity="0.45" />
+        <path d="M38 28 Q44 30 48 33" stroke={MUSCLE_SHADOW} strokeWidth="0.7" fill="none" opacity="0.4" />
 
-        {/* haunch muscle definition */}
-        <path
-          d="M14 22 Q22 20 26 28 Q22 34 16 33 Z"
-          fill={MUSCLE_SHADOW}
-          opacity="0.5"
-        />
-        <path
-          d="M14 18 Q20 18 22 24"
-          stroke={MUSCLE_HI}
-          strokeWidth="0.8"
-          fill="none"
-          opacity="0.4"
-        />
+        {/* haunch — narrower than chest */}
+        <path d="M16 24 Q24 22 28 30 Q24 36 18 35 Z" fill={MUSCLE_SHADOW} opacity="0.5" />
+        <path d="M16 20 Q22 20 24 26" stroke={MUSCLE_HI} strokeWidth="0.8" fill="none" opacity="0.4" />
 
-        {/* warm rim on top of the back */}
-        <path
-          d="M22 11 Q34 9 48 10"
-          stroke={RIM}
-          strokeWidth="1.4"
-          fill="none"
-          opacity="0.55"
-          strokeLinecap="round"
-        />
-        {/* rim on chest crest */}
-        <path
-          d="M64 11 Q74 15 77 24"
-          stroke={RIM}
-          strokeWidth="1.2"
-          fill="none"
-          opacity="0.5"
-          strokeLinecap="round"
-        />
+        {/* rim on back */}
+        <path d="M24 13 Q36 10 50 11" stroke={RIM} strokeWidth="1.4" fill="none" opacity="0.55" strokeLinecap="round" />
+        <path d="M56 10 Q70 10 78 14" stroke={RIM} strokeWidth="1.3" fill="none" opacity="0.6" strokeLinecap="round" />
 
-        {/* ═══════════════════════════════════════════════
-            HEAD — lowered, aggressive, snorting
-            ═══════════════════════════════════════════════ */}
-        <g transform="translate(72, 16)">
+        {/* HEAD */}
+        <g transform="translate(78, 20)">
           <g style={{ animation: `bullHead ${C} ${EASE} infinite`, transformOrigin: '0px 0px' }}>
-            {/* thick neck muscle connecting body to head */}
             <path
-              d="M-6 4 Q-2 -2 4 -3 L10 4 L8 14 Q0 14 -6 10 Z"
+              d="M-10 4 Q-4 -4 6 -5 L12 6 L8 16 Q-2 16 -10 10 Z"
               fill={HIDE_MID}
               stroke={HIDE_DARK}
               strokeWidth="0.6"
             />
-            <path
-              d="M-4 1 Q2 -2 8 2"
-              stroke={MUSCLE_HI}
-              strokeWidth="0.7"
-              fill="none"
-              opacity="0.5"
-            />
+            <path d="M-6 0 Q2 -3 9 4" stroke={MUSCLE_HI} strokeWidth="0.8" fill="none" opacity="0.5" />
 
-            {/* head */}
+            {/* skull */}
             <path
-              d="M4 -4 Q16 -4 18 4 Q20 12 14 16 Q6 18 2 14 Q-2 8 0 0 Z"
+              d="M4 -6 Q16 -6 19 2 Q21 9 15 13 Q6 14 2 10 Q-2 3 0 -3 Z"
               fill={HIDE_LIGHT}
               stroke={HIDE_DARK}
               strokeWidth="0.6"
             />
-            {/* head rim */}
             <path
-              d="M5 -3 Q14 -3 17 3"
+              d="M5 -5 Q14 -5 18 1"
               stroke={RIM}
-              strokeWidth="1"
+              strokeWidth="1.1"
               fill="none"
-              opacity="0.55"
+              opacity="0.6"
               strokeLinecap="round"
             />
 
-            {/* snout / muzzle — lower and forward */}
+            {/* broad flat muzzle */}
             <path
-              d="M12 6 Q22 6 24 12 Q25 16 20 17 Q14 17 11 14 Q9 10 12 6 Z"
+              d="M14 3 Q26 3 28 9 Q28 14 22 15 Q14 15 10 12 Q8 8 14 3 Z"
               fill={HIDE_MID}
               stroke={HIDE_DARK}
               strokeWidth="0.6"
             />
-            {/* muzzle highlight */}
             <path
-              d="M13 8 Q19 8 21 11"
+              d="M15 4 Q24 4 27 8"
               stroke={RIM}
-              strokeWidth="0.7"
+              strokeWidth="0.8"
               fill="none"
-              opacity="0.4"
+              opacity="0.45"
               strokeLinecap="round"
             />
+            <ellipse cx="24" cy="9" rx="4" ry="3.2" fill={NOSE} />
+            <ellipse cx="24" cy="9" rx="3.2" ry="2.4" fill={HIDE_DARK} opacity="0.7" />
 
-            {/* nostrils — dark voids */}
-            <ellipse cx="18" cy="12" rx="1.4" ry="1" fill={HIDE_DARK} />
-            <ellipse cx="18" cy="15" rx="1.2" ry="0.9" fill={HIDE_DARK} />
+            {/* wide-set nostrils */}
+            <ellipse cx="22" cy="9" rx="1.3" ry="1" fill={NOSE} />
+            <ellipse cx="26" cy="9" rx="1.3" ry="1" fill={NOSE} />
 
-            {/* steam puffs from nostrils */}
-            <circle cx="20" cy="11" r="1.2" fill={STEAM}>
-              <animate
-                attributeName="opacity"
-                values="0;0.55;0"
-                dur="1.2s"
-                repeatCount="indefinite"
-              />
-              <animate
-                attributeName="cy"
-                values="11;6;2"
-                dur="1.2s"
-                repeatCount="indefinite"
-              />
-              <animate
-                attributeName="r"
-                values="0.8;1.6;2.2"
-                dur="1.2s"
-                repeatCount="indefinite"
-              />
+            {/* steam */}
+            <circle cx="22" cy="8" r="1.2" fill={STEAM}>
+              <animate attributeName="opacity" values="0;0.55;0" dur="1.2s" repeatCount="indefinite" />
+              <animate attributeName="cy" values="8;3;-1" dur="1.2s" repeatCount="indefinite" />
+              <animate attributeName="r" values="0.8;1.6;2.2" dur="1.2s" repeatCount="indefinite" />
             </circle>
-            <circle cx="21" cy="13" r="1.2" fill={STEAM}>
-              <animate
-                attributeName="opacity"
-                values="0;0.5;0"
-                dur="1.4s"
-                begin="0.35s"
-                repeatCount="indefinite"
-              />
-              <animate
-                attributeName="cy"
-                values="13;8;3"
-                dur="1.4s"
-                begin="0.35s"
-                repeatCount="indefinite"
-              />
-              <animate
-                attributeName="r"
-                values="0.7;1.5;2"
-                dur="1.4s"
-                begin="0.35s"
-                repeatCount="indefinite"
-              />
+            <circle cx="26" cy="8" r="1.2" fill={STEAM}>
+              <animate attributeName="opacity" values="0;0.5;0" dur="1.4s" begin="0.35s" repeatCount="indefinite" />
+              <animate attributeName="cy" values="8;3;-2" dur="1.4s" begin="0.35s" repeatCount="indefinite" />
+              <animate attributeName="r" values="0.7;1.5;2" dur="1.4s" begin="0.35s" repeatCount="indefinite" />
             </circle>
 
-            {/* slobber drip from the jaw */}
+            {/* slobber */}
             <path
-              d="M15 17 Q15 19 14.5 20"
+              d="M17 14 Q17 17 16.5 19"
               stroke={SLOBBER}
               strokeWidth="0.9"
               fill="none"
               opacity="0.7"
               strokeLinecap="round"
             >
-              <animate
-                attributeName="opacity"
-                values="0;0.7;0"
-                dur="1.8s"
-                repeatCount="indefinite"
-              />
+              <animate attributeName="opacity" values="0;0.7;0" dur="1.8s" repeatCount="indefinite" />
             </path>
 
-            {/* EYE — glowing red with halo */}
-            <circle cx="8" cy="6" r="3.2" fill={EYE_GLOW}>
-              <animate
-                attributeName="r"
-                values="3;3.6;3"
-                dur="1.6s"
-                repeatCount="indefinite"
-              />
+            {/* eye */}
+            <circle cx="9" cy="3" r="3.2" fill={EYE_GLOW}>
+              <animate attributeName="r" values="3;3.6;3" dur="1.6s" repeatCount="indefinite" />
             </circle>
-            <circle cx="8" cy="6" r="1.4" fill={EYE} />
-            <circle cx="8.4" cy="5.6" r="0.5" fill="#ffffff" opacity="0.9" />
+            <circle cx="9" cy="3" r="1.4" fill={EYE} />
+            <circle cx="9.4" cy="2.6" r="0.5" fill="#ffffff" opacity="0.9" />
+            <path d="M5 0 L13 1.5" stroke={HIDE_DARK} strokeWidth="1.4" strokeLinecap="round" opacity="0.9" />
 
-            {/* HORNS — long, curved, threatening */}
-            <path
-              d="M5 -3 Q2 -8 -4 -10"
-              stroke={HORN}
-              strokeWidth="2.8"
-              fill="none"
-              strokeLinecap="round"
-            />
-            <path
-              d="M6 -3 Q4 -8 0 -11"
-              stroke={HORN_SHADOW}
-              strokeWidth="0.8"
-              fill="none"
-              opacity="0.6"
-              strokeLinecap="round"
-            />
-            <path
-              d="M11 -3 Q14 -8 18 -11"
-              stroke={HORN}
-              strokeWidth="2.8"
-              fill="none"
-              strokeLinecap="round"
-            />
-            <path
-              d="M12 -3 Q15 -7 17 -10"
-              stroke={HORN_SHADOW}
-              strokeWidth="0.8"
-              fill="none"
-              opacity="0.6"
-              strokeLinecap="round"
-            />
-            {/* horn tips — sharp */}
-            <circle cx="-4" cy="-10" r="1.4" fill={HORN} />
-            <circle cx="18" cy="-11" r="1.4" fill={HORN} />
+            {/* horns — wide-set, curving up and out */}
+            <path d="M4 -5 Q0 -12 -8 -15" stroke={HORN} strokeWidth="3.2" fill="none" strokeLinecap="round" />
+            <path d="M4 -5 Q1 -11 -6 -14" stroke={HORN_SHADOW} strokeWidth="0.8" fill="none" opacity="0.55" strokeLinecap="round" />
+            <circle cx="-8" cy="-15" r="1.8" fill={HORN_TIP} />
 
-            {/* ears — small, back against the skull */}
-            <ellipse cx="4" cy="-1" rx="2.4" ry="1.3" fill={HIDE_DARK} transform="rotate(-30 4 -1)" />
-            <ellipse cx="13" cy="-1" rx="2.4" ry="1.3" fill={HIDE_DARK} transform="rotate(30 13 -1)" />
+            <path d="M15 -5 Q20 -12 28 -15" stroke={HORN} strokeWidth="3.2" fill="none" strokeLinecap="round" />
+            <path d="M15 -5 Q19 -11 26 -14" stroke={HORN_SHADOW} strokeWidth="0.8" fill="none" opacity="0.55" strokeLinecap="round" />
+            <circle cx="28" cy="-15" r="1.8" fill={HORN_TIP} />
+
+            {/* ears */}
+            <ellipse cx="3" cy="-2" rx="2.6" ry="1.4" fill={HIDE_DARK} transform="rotate(-35 3 -2)" />
+            <ellipse cx="16" cy="-2" rx="2.6" ry="1.4" fill={HIDE_DARK} transform="rotate(35 16 -2)" />
           </g>
         </g>
 
-        {/* ═══════════════════════════════════════════════
-            FRONT LEGS (near side) — thick, muscular
-            ═══════════════════════════════════════════════ */}
-        <g transform="translate(30, 34)">
+        {/* FRONT LEGS (near side) */}
+        <g transform="translate(34, 38)">
           <g style={{ transformOrigin: '0px 0px', animation: `bullFrontThigh ${C} ${EASE} infinite` }}>
-            {/* thigh muscle mass */}
-            <ellipse cx="0" cy="-2" rx="3.4" ry="4" fill={HIDE_MID} />
-            <line x1="0" y1="0" x2="0" y2="8" stroke={HIDE_MID} strokeWidth="5.4" strokeLinecap="round" />
+            <ellipse cx="0" cy="-2" rx="3.6" ry="4.2" fill={HIDE_MID} />
+            <line x1="0" y1="0" x2="0" y2="8" stroke={HIDE_MID} strokeWidth="5.6" strokeLinecap="round" />
             <g transform="translate(0, 8)">
               <g style={{ transformOrigin: '0px 0px', animation: `bullFrontShin ${C} ${EASE} infinite` }}>
-                <line x1="0" y1="0" x2="0" y2="8" stroke={HIDE_MID} strokeWidth="4.4" strokeLinecap="round" />
+                <line x1="0" y1="0" x2="0" y2="8" stroke={HIDE_MID} strokeWidth="4.6" strokeLinecap="round" />
                 <ellipse cx="1" cy="9" rx="3.2" ry="1.7" fill={HOOF} />
               </g>
             </g>
           </g>
         </g>
-        <g transform="translate(66, 34)">
+        <g transform="translate(72, 38)">
           <g style={{ transformOrigin: '0px 0px', animation: `bullBackThigh ${C} ${EASE} infinite` }}>
             <ellipse cx="0" cy="-2" rx="3.4" ry="4" fill={HIDE_MID} />
             <line x1="0" y1="0" x2="0" y2="8" stroke={HIDE_MID} strokeWidth="5.4" strokeLinecap="round" />
@@ -1002,15 +904,13 @@ const Bull: React.FC = () => {
           </g>
         </g>
 
-        {/* ═══════════════════════════════════════════════
-            DUST from the near hooves
-            ═══════════════════════════════════════════════ */}
-        <g transform="translate(30, 44)">
+        {/* hoof dust */}
+        <g transform="translate(34, 48)">
           <g style={{ animation: `hoofDust ${C} ${EASE} infinite` }}>
             <circle cx="0" cy="0" r="2.6" fill="rgba(200,180,150,0.4)" />
           </g>
         </g>
-        <g transform="translate(66, 44)">
+        <g transform="translate(72, 48)">
           <g style={{ animation: `hoofDust ${C} ${EASE} infinite`, animationDelay: '-0.21s' }}>
             <circle cx="0" cy="0" r="2.6" fill="rgba(200,180,150,0.4)" />
           </g>
@@ -1021,8 +921,12 @@ const Bull: React.FC = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   BULL LOGO — small angular bull-head mark
-   Angular geometric, not cartoon. Reads at 26px.
+   BULL LOGO — proper bull head: wide-set curved horns, broad muzzle,
+   angry brow, square jaw. Reads clean at 26px.
+   ═══════════════════════════════════════════════════════════════════ */
+/* /* ═══════════════════════════════════════════════════════════════════
+   BULL LOGO — charging bull, muscular build, tight stomach,
+   massive front quarter, head-down aggressive stance.
    ═══════════════════════════════════════════════════════════════════ */
 const BullLogo: React.FC<{ size?: number }> = ({ size = 26 }) => (
   <svg
@@ -1038,42 +942,96 @@ const BullLogo: React.FC<{ size?: number }> = ({ size = 26 }) => (
         <stop offset="100%" stopColor="#ff6b9d" />
       </linearGradient>
     </defs>
-    {/* outer glow ring */}
-    <circle cx="16" cy="16" r="15" fill="none" stroke="url(#bullLogoGrad)" strokeWidth="0.6" opacity="0.5" />
-    {/* horns sweeping up */}
-    <path
-      d="M4 12 Q3 6 8 4 Q7 8 9 12"
-      fill="url(#bullLogoGrad)"
-      opacity="0.95"
-    />
-    <path
-      d="M28 12 Q29 6 24 4 Q25 8 23 12"
-      fill="url(#bullLogoGrad)"
-      opacity="0.95"
-    />
-    {/* head — angular shield shape */}
+
+    {/* ── BODY — tight stomach, tucked waist, big front ── */}
     <path
       d="
-        M9 11
-        L23 11
-        L23 18
-        Q23 25 16 27
-        Q9 25 9 18
+        M5 19
+        Q4 15 7 12
+        Q11 9 17 9
+        Q23 9 26 12
+        Q28 15 27 19
+        Q26 21.5 23 22.5
+        L17 23
+        L12 22.5
+        Q7 22 5.5 20
+        Q5 19.5 5 19
         Z
       "
       fill="url(#bullLogoGrad)"
     />
-    {/* brow / eyes — negative space */}
-    <path d="M11 15 L14 15 L13 17 L11 17 Z" fill="#0a0a0b" />
-    <path d="M21 15 L18 15 L19 17 L21 17 Z" fill="#0a0a0b" />
-    {/* muzzle nostrils */}
-    <circle cx="14" cy="22" r="0.9" fill="#0a0a0b" />
-    <circle cx="18" cy="22" r="0.9" fill="#0a0a0b" />
-    {/* inner highlight */}
+
+    {/* ── SHOULDER HUMP — exaggerated, sits high above front legs ── */}
     <path
-      d="M11 12 L14 12 L14 14 L11 14 Z"
-      fill="#ffffff"
-      opacity="0.25"
+      d="M15 9 Q21 7.5 25 10 Q26 13 24 15 Q20 16 17 14.5 Q14 12 15 9 Z"
+      fill="url(#bullLogoGrad)"
+      opacity="0.9"
     />
+
+    {/* ── CHEST MASS — big rounded pec, drops below the belly line ── */}
+    <path
+      d="M23 13 Q27 15 27 19 Q26 22 22 22.5 Q24 18 23 13 Z"
+      fill="url(#bullLogoGrad)"
+      opacity="0.85"
+    />
+
+    {/* ── HAUNCH — narrow rear hip, tight ── */}
+    <path
+      d="M6 15 Q9 14 11 17 Q11 21 8 22 Q6 20 6 15 Z"
+      fill="url(#bullLogoGrad)"
+      opacity="0.7"
+    />
+
+    {/* ── HEAD — lowered, forward-thrust, compact ── */}
+    <path
+      d="
+        M21 17
+        Q27 17 29 20
+        Q30 23 27 24
+        Q24 24 22 22
+        Q20 20 21 17
+        Z
+      "
+      fill="url(#bullLogoGrad)"
+    />
+
+    {/* ── HORNS — wide-set, one forward one back ── */}
+    <path d="M25 17 Q28 14 31 13 Q29 16 27 18 Z" fill="url(#bullLogoGrad)" opacity="0.95" />
+    <path d="M23 16 Q24 13 27 11 Q26 14 25 16 Z" fill="url(#bullLogoGrad)" opacity="0.75" />
+
+    {/* ── FRONT LEG — extended forward mid-stride ── */}
+    <path
+      d="M21 22.5 L19 28 Q18.5 29.5 19 30.5 L21 30.5 Q21.5 29.5 22 27.5 L23 22.5 Z"
+      fill="url(#bullLogoGrad)"
+    />
+    {/* ── BACK LEG — planted, driving ── */}
+    <path
+      d="M9 22.5 L8 28 Q7.5 29.5 8 30.5 L10 30.5 Q10.5 29.5 11 27.5 L12 22.5 Z"
+      fill="url(#bullLogoGrad)"
+    />
+    {/* ── SECOND FRONT LEG — tucked back ── */}
+    <path
+      d="M24 22 L24 27 Q23.5 28.5 24 29.5 L26 29.5 Q26.5 28.5 26.5 26.5 L26 22 Z"
+      fill="url(#bullLogoGrad)"
+      opacity="0.7"
+    />
+
+    {/* ── TAIL — whipping up and back ── */}
+    <path
+      d="M5 17 Q3 14 2 11 Q4 13 6 14"
+      fill="none"
+      stroke="url(#bullLogoGrad)"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+
+    {/* ── NEGATIVE-SPACE DETAILS ── */}
+    {/* angry eye slit on the lowered head */}
+    <path d="M25 19 L27 19.5 L27 20 L25 19.7 Z" fill="#0a0a0b" opacity="0.95" />
+    {/* muzzle shadow */}
+    <path d="M28 21 Q29 22 28.5 23" stroke="#0a0a0b" strokeWidth="0.8" fill="none" opacity="0.6" strokeLinecap="round" />
+    {/* rib striations on the flank — sells the muscle */}
+    <path d="M13 13 Q15 14 15 16" stroke="#0a0a0b" strokeWidth="0.5" fill="none" opacity="0.35" strokeLinecap="round" />
+    <path d="M15 12.5 Q17 13.5 17 15.5" stroke="#0a0a0b" strokeWidth="0.5" fill="none" opacity="0.3" strokeLinecap="round" />
   </svg>
 );

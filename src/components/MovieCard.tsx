@@ -1,9 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Plus, Check, Star } from 'lucide-react';
+import { Play, Star } from 'lucide-react';
 import { MediaItem } from '../types';
 import { getImageUrl } from '../lib/api';
-import { useWatchlist } from '../stores/watchlist';
 import { useHoverPreview } from '../stores/hoverPreview';
 
 interface MovieCardProps {
@@ -25,11 +24,6 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
     const showPreview = useHoverPreview((s) => s.show);
     const hidePreview = useHoverPreview((s) => s.hide);
 
-    const inList = useWatchlist((s) =>
-      Boolean(s.items[`${item.media_type}-${item.id}`])
-    );
-    const toggleWatchlist = useWatchlist((s) => s.toggle);
-
     /* ---------- Faster hover with rAF throttle ---------- */
     const onMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
       if (window.matchMedia('(hover: none)').matches) return;
@@ -38,7 +32,6 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
       if (enterRafRef.current) cancelAnimationFrame(enterRafRef.current);
       if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current);
 
-      // 1 rAF = next frame; feels instant but batches the store write
       enterRafRef.current = requestAnimationFrame(() => {
         showPreview(item, rect);
       });
@@ -56,7 +49,7 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
       ? item.first_air_date.substring(0, 4)
       : '2026';
 
-    const posterSrc = getImageUrl(item.poster_path, 'w342'); // ← smaller image
+    const posterSrc = getImageUrl(item.poster_path, 'w342');
     const title = item.title || (item as any).name || 'Untitled';
 
     const goToDetails = () => {
@@ -73,21 +66,6 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
       goToDetails();
     };
 
-    const handleToggleList = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      toggleWatchlist({
-        id: item.id,
-        type: item.media_type,
-        title,
-        posterPath: item.poster_path,
-        backdropPath: item.backdrop_path,
-        year: releaseYear,
-        rating: item.vote_average,
-        overview: item.overview,
-      });
-    };
-
-    /* First 12 cards animate in; the rest are instant (avoids 100+ concurrent animations) */
     const shouldAnimate = index < 12;
 
     return (
@@ -112,9 +90,7 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
         <div
           className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/[0.08] transition-[border-color,box-shadow] duration-200 group-hover:border-[rgba(124,92,255,0.4)]"
           style={{
-            // CSS variable-driven shadow: only the shadow value changes, no layout
             boxShadow: 'var(--mc-shadow, 0 0 0 0 rgba(0,0,0,0))',
-            // Hint the browser to keep this layer warm
             contain: 'layout paint',
           }}
         >
@@ -130,11 +106,9 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
                 onError={() => setImageError(true)}
                 className="h-full w-full object-cover"
                 style={{
-                  // Transform-only — GPU accelerated, no reflow
                   transform: imageLoaded ? 'scale(1)' : 'scale(0.98)',
                   opacity: imageLoaded ? 1 : 0,
                   transition: 'transform 220ms ease-out, opacity 200ms ease-out',
-                  // Avoid repainting while scrolling
                   willChange: imageLoaded ? 'auto' : 'opacity',
                 }}
               />
@@ -150,10 +124,8 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
             </div>
           )}
 
-          {/* Static gradient — no blur, painted once */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent pointer-events-none" />
 
-          {/* Rank badge — no backdrop-filter (was the biggest CPU hog) */}
           {rank !== undefined && (
             <div
               className="absolute top-2.5 left-2.5 w-8 h-8 rounded-xl flex items-center justify-center font-bold text-[13px] text-white z-10"
@@ -172,7 +144,6 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
             </div>
           )}
 
-          {/* Rating chip — solid bg, no blur */}
           {item.vote_average > 0 && (
             <div className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[11px] font-medium tabular-nums text-white px-2 py-0.5 rounded-md bg-black/85 border border-white/[0.08] z-10">
               <Star
@@ -183,8 +154,8 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
             </div>
           )}
 
-          {/* Hover overlay — opacity only, no blur, no transforms */}
-          <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex flex-col items-center justify-center gap-2.5">
+          {/* Hover overlay — play button only */}
+          <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex flex-col items-center justify-center">
             <button
               type="button"
               onClick={handlePlay}
@@ -193,37 +164,6 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
             >
               <Play className="w-4 h-4 fill-current ml-0.5" strokeWidth={0} />
             </button>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleToggleList}
-                aria-label={inList ? 'Remove from list' : 'Add to list'}
-                className={`w-8 h-8 rounded-full flex items-center justify-center border transition-colors duration-150 active:scale-95 cursor-pointer ${
-                  inList
-                    ? 'bg-[rgba(124,92,255,0.25)] border-[rgba(124,92,255,0.6)] text-[#7c5cff]'
-                    : 'bg-black/60 border-white/[0.25] text-white hover:bg-white hover:text-black'
-                }`}
-              >
-                {inList ? (
-                  <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                ) : (
-                  <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCardClick();
-                }}
-                aria-label="More information"
-                className="w-8 h-8 rounded-full bg-black/60 border border-white/[0.25] text-white hover:bg-white hover:text-black transition-colors duration-150 active:scale-95 flex items-center justify-center cursor-pointer"
-              >
-                <span className="text-[14px] font-bold leading-none">i</span>
-              </button>
-            </div>
           </div>
         </div>
 

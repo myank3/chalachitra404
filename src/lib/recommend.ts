@@ -1,40 +1,21 @@
 import { MediaItem, MediaType } from '../types';
-import { MOCK_MEDIA_ITEMS } from '../data/mockData';
 import { TMDB_API_KEY, TMDB_BASE_URL } from './api';
 
-// TMDB Standard Genre Map
+/* ------------------------------------------------------------------
+   GENRE MAP
+   ------------------------------------------------------------------ */
 export const TMDB_GENRES: Record<number, string> = {
-  28: 'Action',
-  12: 'Adventure',
-  16: 'Animation',
-  35: 'Comedy',
-  80: 'Crime',
-  99: 'Documentary',
-  18: 'Drama',
-  10751: 'Family',
-  14: 'Fantasy',
-  36: 'History',
-  27: 'Horror',
-  10402: 'Music',
-  9648: 'Mystery',
-  10749: 'Romance',
-  878: 'Science Fiction',
-  10770: 'TV Movie',
-  53: 'Thriller',
-  10752: 'War',
-  37: 'Western',
-  10759: 'Action & Adventure',
-  10762: 'Kids',
-  10763: 'News',
-  10764: 'Reality',
-  10765: 'Sci-Fi & Fantasy',
-  10766: 'Soap',
-  10767: 'Talk',
-  10768: 'War & Politics',
+  28: 'Action', 12: 'Adventure', 16: 'Animation', 35: 'Comedy',
+  80: 'Crime', 99: 'Documentary', 18: 'Drama', 10751: 'Family',
+  14: 'Fantasy', 36: 'History', 27: 'Horror', 10402: 'Music',
+  9648: 'Mystery', 10749: 'Romance', 878: 'Science Fiction',
+  10770: 'TV Movie', 53: 'Thriller', 10752: 'War', 37: 'Western',
+  10759: 'Action & Adventure', 10762: 'Kids', 10763: 'News',
+  10764: 'Reality', 10765: 'Sci-Fi & Fantasy', 10766: 'Soap',
+  10767: 'Talk', 10768: 'War & Politics',
 };
 
-// Default fallback genres if user has no interactions yet
-export const DEFAULT_GENRES = [28, 18, 878]; // Action, Drama, Sci-Fi
+export const DEFAULT_GENRES = [28, 18, 878];
 
 export interface GenreCount {
   id: number;
@@ -42,28 +23,33 @@ export interface GenreCount {
   count: number;
 }
 
-/**
- * Record a title visit into localStorage history (capped at 30)
- */
+/* ------------------------------------------------------------------
+   INTERACTION STORAGE
+   ------------------------------------------------------------------ */
+
+interface HistoryEntry {
+  id: string | number;
+  type: MediaType;
+  title: string;
+  genre_ids?: number[];
+  timestamp: number;
+}
+
+const HISTORY_KEY = 'chalachitra:history';
+
+/** Record a title visit into localStorage history (capped at 50) */
 export function recordHistory(item: MediaItem) {
   if (typeof window === 'undefined') return;
   try {
-    const key = 'chalachitra:history';
-    const raw = localStorage.getItem(key);
-    let history: {
-      id: string | number;
-      type: MediaType;
-      title: string;
-      genre_ids?: number[];
-      timestamp: number;
-    }[] = raw ? JSON.parse(raw) : [];
+    const raw = localStorage.getItem(HISTORY_KEY);
+    let history: HistoryEntry[] = raw ? JSON.parse(raw) : [];
 
     history = history.filter(
       (h) => !(String(h.id) === String(item.id) && h.type === item.media_type)
     );
 
     let genre_ids = item.genre_ids || [];
-    if ((!genre_ids || genre_ids.length === 0) && item.genres) {
+    if (genre_ids.length === 0 && item.genres) {
       genre_ids = item.genres.map((g) => g.id);
     }
 
@@ -75,38 +61,113 @@ export function recordHistory(item: MediaItem) {
       timestamp: Date.now(),
     });
 
-    if (history.length > 30) {
-      history = history.slice(0, 30);
-    }
-
-    localStorage.setItem(key, JSON.stringify(history));
-  } catch {
-    // ignore
-  }
+    if (history.length > 50) history = history.slice(0, 50);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {}
 }
 
-/**
- * Mark a title as watched in localStorage
- */
+/** Mark a title as watched */
 export function recordWatched(id: string | number) {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(`chalachitra:watched:${id}`, 'true');
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
-/**
- * Read user interaction history from localStorage and count genre frequencies
- */
+/** Read the raw interaction list — used as seeds for /recommendations */
+function readSeeds(): { id: string; type: MediaType; weight: number }[] {
+  const seeds: { id: string; type: MediaType; weight: number }[] = [];
+  if (typeof window === 'undefined') return seeds;
+
+  const push = (id: string | number, type: MediaType, weight: number) => {
+    const s = String(id);
+    if (!seeds.some((x) => x.id === s)) {
+      seeds.push({ id: s, type, weight });
+    }
+  };
+
+  // 1. History (most recent 10, highest weight)
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw) {
+      const history: HistoryEntry[] = JSON.parse(raw);
+      history.slice(0, 10).forEach((h, i) => {
+        push(h.id, h.type, 3 - i * 0.1); // recent = heavier
+      });
+    }
+  } catch {}
+
+  // 2. Watchlist
+  try {
+    const raw = localStorage.getItem('chalachitra:watchlist');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const items = parsed.state?.items || {};
+      Object.values(items).forEach((w: any) => {
+        push(w.id, w.type || 'movie', 2.5);
+      });
+    }
+  } catch {}
+
+  // 3. Continue watching
+  try {
+    const rawUI = localStorage.getItem('chalachitra:ui');
+    if (rawUI) {
+      const parsed = JSON.parse(rawUI);
+      const cw = parsed.state?.continueWatching || [];
+      cw.forEach((c: any) => {
+        push(c.id, c.type || 'movie', 2);
+      });
+    }
+  } catch {}
+
+  return seeds;
+}
+
+/** Excluded: already in watchlist, watched, or opened in last 7 days */
+function getExcludedIds(): Set<string> {
+  const excluded = new Set<string>();
+  if (typeof window === 'undefined') return excluded;
+
+  try {
+    const raw = localStorage.getItem('chalachitra:watchlist');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const items = parsed.state?.items || {};
+      Object.values(items).forEach((w: any) => excluded.add(String(w.id)));
+    }
+  } catch {}
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('chalachitra:watched:')) {
+        excluded.add(key.replace('chalachitra:watched:', ''));
+      }
+    }
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw) {
+      const history: HistoryEntry[] = JSON.parse(raw);
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      history.forEach((h) => {
+        if (h.timestamp > sevenDaysAgo) excluded.add(String(h.id));
+      });
+    }
+  } catch {}
+
+  return excluded;
+}
+
+/** Genre frequencies — kept for the insight card on the page */
 export function getUserGenreFrequencies(): {
   genreCounts: GenreCount[];
   topGenres: GenreCount[];
   excludedIds: Set<string>;
 } {
-  const genreFrequencyMap = new Map<number, number>();
-  const excludedIds = new Set<string>();
+  const freqMap = new Map<number, number>();
 
   if (typeof window === 'undefined') {
     return {
@@ -116,99 +177,35 @@ export function getUserGenreFrequencies(): {
         name: TMDB_GENRES[id] || 'General',
         count: 0,
       })),
-      excludedIds,
+      excludedIds: new Set(),
     };
   }
 
-  // Helper to count genres for an item
-  const countItemGenres = (genreIds?: number[], fallbackId?: string | number) => {
-    let ids = genreIds;
-    if (!ids || ids.length === 0) {
-      const match = MOCK_MEDIA_ITEMS.find((m) => String(m.id) === String(fallbackId));
-      if (match?.genre_ids) {
-        ids = match.genre_ids;
-      }
-    }
-    if (ids && Array.isArray(ids)) {
-      ids.forEach((gId) => {
-        if (TMDB_GENRES[gId]) {
-          genreFrequencyMap.set(gId, (genreFrequencyMap.get(gId) || 0) + 1);
-        }
-      });
-    }
+  const count = (ids?: number[]) => {
+    if (!ids) return;
+    ids.forEach((id) => {
+      if (TMDB_GENRES[id]) freqMap.set(id, (freqMap.get(id) || 0) + 1);
+    });
   };
 
-  // 1. Read chalachitra:watchlist
   try {
-    const rawWatchlist = localStorage.getItem('chalachitra:watchlist');
-    if (rawWatchlist) {
-      const parsed = JSON.parse(rawWatchlist);
+    const raw = localStorage.getItem('chalachitra:watchlist');
+    if (raw) {
+      const parsed = JSON.parse(raw);
       const items = parsed.state?.items || {};
-      Object.values(items).forEach((w: any) => {
-        excludedIds.add(String(w.id));
-        countItemGenres(w.genre_ids, w.id);
-      });
+      Object.values(items).forEach((w: any) => count(w.genre_ids));
     }
-  } catch (err) {
-    console.warn('Error reading watchlist:', err);
-  }
+  } catch {}
 
-  // 2. Read watched titles (chalachitra:watched:* and continueWatching completed)
   try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('chalachitra:watched:')) {
-        const id = key.replace('chalachitra:watched:', '');
-        if (id) {
-          excludedIds.add(String(id));
-          countItemGenres(undefined, id);
-        }
-      }
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw) {
+      const history: HistoryEntry[] = JSON.parse(raw);
+      history.slice(0, 30).forEach((h) => count(h.genre_ids));
     }
+  } catch {}
 
-    const rawUI = localStorage.getItem('chalachitra:ui');
-    if (rawUI) {
-      const parsed = JSON.parse(rawUI);
-      const cw = parsed.state?.continueWatching || [];
-      cw.forEach((c: any) => {
-        if (c.progress >= 95) {
-          excludedIds.add(String(c.id));
-        }
-        countItemGenres(c.genre_ids, c.id);
-      });
-    }
-  } catch (err) {
-    console.warn('Error reading watched items:', err);
-  }
-
-  // 3. Read chalachitra:history (last 30 titles opened)
-  try {
-    const rawHistory = localStorage.getItem('chalachitra:history');
-    if (rawHistory) {
-      const historyList: {
-        id: string | number;
-        type: MediaType;
-        title: string;
-        genre_ids?: number[];
-        timestamp: number;
-      }[] = JSON.parse(rawHistory);
-
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-
-      historyList.slice(0, 30).forEach((h) => {
-        // Exclude titles opened in last 7 days
-        if (h.timestamp && h.timestamp > sevenDaysAgo) {
-          excludedIds.add(String(h.id));
-        }
-        countItemGenres(h.genre_ids, h.id);
-      });
-    }
-  } catch (err) {
-    console.warn('Error reading history:', err);
-  }
-
-  // Sort genres by frequency
-  const genreCounts: GenreCount[] = Array.from(genreFrequencyMap.entries())
+  const genreCounts: GenreCount[] = Array.from(freqMap.entries())
     .map(([id, count]) => ({
       id,
       name: TMDB_GENRES[id] || `Genre ${id}`,
@@ -216,117 +213,111 @@ export function getUserGenreFrequencies(): {
     }))
     .sort((a, b) => b.count - a.count);
 
-  // Pick top 3 genres, or backfill with defaults
   const topGenres: GenreCount[] = [...genreCounts.slice(0, 3)];
-  for (const defId of DEFAULT_GENRES) {
+  for (const def of DEFAULT_GENRES) {
     if (topGenres.length >= 3) break;
-    if (!topGenres.some((g) => g.id === defId)) {
-      topGenres.push({
-        id: defId,
-        name: TMDB_GENRES[defId],
-        count: 0,
-      });
+    if (!topGenres.some((g) => g.id === def)) {
+      topGenres.push({ id: def, name: TMDB_GENRES[def], count: 0 });
     }
   }
 
-  return {
-    genreCounts,
-    topGenres,
-    excludedIds,
-  };
+  return { genreCounts, topGenres, excludedIds: getExcludedIds() };
+}
+
+/* ------------------------------------------------------------------
+   TMDB FETCHING — /recommendations seeded by user's real interactions
+   ------------------------------------------------------------------ */
+
+const inflight = new Map<string, Promise<MediaItem[]>>();
+
+async function fetchRecommendationsForSeed(
+  seedId: string,
+  seedType: MediaType,
+  signal?: AbortSignal
+): Promise<MediaItem[]> {
+  const cacheKey = `${seedType}:${seedId}`;
+  if (inflight.has(cacheKey)) return inflight.get(cacheKey)!;
+
+  const promise = (async () => {
+    const url = new URL(`${TMDB_BASE_URL}/${seedType}/${seedId}/recommendations`);
+    url.searchParams.set('api_key', TMDB_API_KEY);
+    url.searchParams.set('language', 'en-US');
+    url.searchParams.set('page', '1');
+
+    try {
+      const res = await fetch(url.toString(), { signal });
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data.results)) return [];
+
+      return data.results.map((r: any) => ({
+        id: r.id,
+        media_type: r.media_type || seedType,
+        title: r.title || r.name || 'Untitled',
+        overview: r.overview || '',
+        poster_path: r.poster_path,
+        backdrop_path: r.backdrop_path,
+        vote_average: r.vote_average || 0,
+        vote_count: r.vote_count || 0,
+        release_date: r.release_date,
+        first_air_date: r.first_air_date,
+        genre_ids: r.genre_ids || [],
+        popularity: r.popularity || 0,
+      })) as MediaItem[];
+    } catch {
+      return [];
+    } finally {
+      inflight.delete(cacheKey);
+    }
+  })();
+
+  inflight.set(cacheKey, promise);
+  return promise;
 }
 
 /**
- * Fetch candidate titles for a given genre from TMDB
- * Limit to 20 per genre (combines up to 10 movies and 10 tv shows)
+ * Fallback for cold-start users with no interactions.
+ * Uses trending + top-rated from TMDB instead of genre discover.
  */
-async function fetchCandidatesForGenre(
-  genreId: number,
-  signal?: AbortSignal
-): Promise<MediaItem[]> {
+async function fetchColdStart(signal?: AbortSignal): Promise<MediaItem[]> {
+  const urls = [
+    `${TMDB_BASE_URL}/trending/all/week?api_key=${TMDB_API_KEY}&language=en-US`,
+    `${TMDB_BASE_URL}/movie/top_rated?api_key=${TMDB_API_KEY}&language=en-US&page=1`,
+    `${TMDB_BASE_URL}/tv/top_rated?api_key=${TMDB_API_KEY}&language=en-US&page=1`,
+  ];
+
+  const results = await Promise.allSettled(
+    urls.map((u) => fetch(u, { signal }).then((r) => (r.ok ? r.json() : { results: [] })))
+  );
+
   const items: MediaItem[] = [];
-
-  try {
-    // 1. Fetch movies: /discover/movie?with_genres={genreId}&sort_by=vote_average.desc&vote_count.gte=500
-    const movieUrl = new URL(`${TMDB_BASE_URL}/discover/movie`);
-    movieUrl.searchParams.set('api_key', TMDB_API_KEY);
-    movieUrl.searchParams.set('with_genres', String(genreId));
-    movieUrl.searchParams.set('sort_by', 'vote_average.desc');
-    movieUrl.searchParams.set('vote_count.gte', '500');
-    movieUrl.searchParams.set('language', 'en-US');
-    movieUrl.searchParams.set('page', '1');
-
-    // 2. Fetch tv shows: /discover/tv?with_genres={genreId}&sort_by=vote_average.desc&vote_count.gte=200
-    const tvUrl = new URL(`${TMDB_BASE_URL}/discover/tv`);
-    tvUrl.searchParams.set('api_key', TMDB_API_KEY);
-    tvUrl.searchParams.set('with_genres', String(genreId));
-    tvUrl.searchParams.set('sort_by', 'vote_average.desc');
-    tvUrl.searchParams.set('vote_count.gte', '200');
-    tvUrl.searchParams.set('language', 'en-US');
-    tvUrl.searchParams.set('page', '1');
-
-    const [movieRes, tvRes] = await Promise.allSettled([
-      fetch(movieUrl.toString(), { signal }),
-      fetch(tvUrl.toString(), { signal }),
-    ]);
-
-    if (movieRes.status === 'fulfilled' && movieRes.value.ok) {
-      const data = await movieRes.value.json();
-      if (Array.isArray(data.results)) {
-        data.results.slice(0, 10).forEach((m: any) => {
-          items.push({
-            id: m.id,
-            media_type: 'movie',
-            title: m.title || m.original_title || 'Untitled',
-            overview: m.overview || '',
-            poster_path: m.poster_path,
-            backdrop_path: m.backdrop_path,
-            vote_average: m.vote_average || 0,
-            release_date: m.release_date,
-            genre_ids: m.genre_ids || [genreId],
-            popularity: m.popularity || 0,
-          });
-        });
-      }
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    for (const raw of r.value.results || []) {
+      const type = raw.media_type || (raw.title ? 'movie' : 'tv');
+      if (type !== 'movie' && type !== 'tv') continue;
+      items.push({
+        id: raw.id,
+        media_type: type,
+        title: raw.title || raw.name || 'Untitled',
+        overview: raw.overview || '',
+        poster_path: raw.poster_path,
+        backdrop_path: raw.backdrop_path,
+        vote_average: raw.vote_average || 0,
+        vote_count: raw.vote_count || 0,
+        release_date: raw.release_date,
+        first_air_date: raw.first_air_date,
+        genre_ids: raw.genre_ids || [],
+        popularity: raw.popularity || 0,
+      } as MediaItem);
     }
-
-    if (tvRes.status === 'fulfilled' && tvRes.value.ok) {
-      const data = await tvRes.value.json();
-      if (Array.isArray(data.results)) {
-        data.results.slice(0, 10).forEach((t: any) => {
-          items.push({
-            id: t.id,
-            media_type: 'tv',
-            title: t.name || t.original_name || 'Untitled',
-            overview: t.overview || '',
-            poster_path: t.poster_path,
-            backdrop_path: t.backdrop_path,
-            vote_average: t.vote_average || 0,
-            first_air_date: t.first_air_date,
-            genre_ids: t.genre_ids || [genreId],
-            popularity: t.popularity || 0,
-          });
-        });
-      }
-    }
-  } catch (err) {
-    console.warn(`Error discovering titles for genre ${genreId}:`, err);
   }
-
-  // Fallback to local mock data if fetch returned few or no items
-  if (items.length < 5) {
-    const localMatches = MOCK_MEDIA_ITEMS.filter((m) =>
-      m.genre_ids?.includes(genreId)
-    );
-    localMatches.forEach((m) => {
-      if (!items.some((existing) => String(existing.id) === String(m.id))) {
-        items.push(m);
-      }
-    });
-  }
-
-  return items.slice(0, 20);
+  return items;
 }
+
+/* ------------------------------------------------------------------
+   PUBLIC API
+   ------------------------------------------------------------------ */
 
 export interface RecommendationOptions {
   type?: 'all' | 'movie' | 'tv';
@@ -336,15 +327,13 @@ export interface RecommendationOptions {
 }
 
 /**
- * Generate pure genre-based recommendations:
- * 1. Read user history (watchlist, watched, history)
- * 2. Count genre frequency
- * 3. Pick top 3 genres
- * 4. Fetch candidates per genre (up to 20 each)
- * 5. Merge and dedupe by id
- * 6. Remove excluded titles (in watchlist, watched, or opened in last 7 days)
- * 7. Sort by vote_average desc, then popularity desc
- * 8. Return top 40 (or specified limit)
+ * Real recommender:
+ *   1. Read user seeds (history + watchlist + continue-watching)
+ *   2. For each seed, call TMDB's /recommendations endpoint
+ *   3. Merge + score by how many seeds endorsed each candidate
+ *   4. Blend in vote_average and popularity for tie-breaks
+ *   5. Exclude watched / already-saved items
+ *   6. Filter by type + genre if requested
  */
 export async function getRecommendations(
   options: RecommendationOptions = {},
@@ -352,77 +341,112 @@ export async function getRecommendations(
 ): Promise<MediaItem[]> {
   const { type = 'all', selectedGenreId, sourceItem, limit = 40 } = options;
 
-  const { topGenres, excludedIds } = getUserGenreFrequencies();
+  // Build seeds. If sourceItem given (Watch page context), use it as the only seed.
+  let seeds: { id: string; type: MediaType; weight: number }[];
 
-  // If a sourceItem is specified (e.g. from Watch page), prioritize its genres
-  let genresToFetch: number[] = [];
-
-  if (selectedGenreId) {
-    genresToFetch = [selectedGenreId];
-  } else if (sourceItem) {
-    let sourceGenreIds = sourceItem.genre_ids || [];
-    if (sourceGenreIds.length === 0 && sourceItem.genres) {
-      sourceGenreIds = sourceItem.genres.map((g) => g.id);
-    }
-    if (sourceGenreIds.length > 0) {
-      genresToFetch = sourceGenreIds.slice(0, 3);
-    } else {
-      genresToFetch = topGenres.map((g) => g.id);
-    }
-    // Also exclude the sourceItem itself
-    excludedIds.add(String(sourceItem.id));
+  if (sourceItem) {
+    seeds = [{ id: String(sourceItem.id), type: sourceItem.media_type, weight: 1 }];
   } else {
-    genresToFetch = topGenres.map((g) => g.id);
+    seeds = readSeeds().slice(0, 8); // cap to 8 seed fetches
   }
 
-  if (genresToFetch.length === 0) {
-    genresToFetch = DEFAULT_GENRES;
+  const excluded = getExcludedIds();
+  if (sourceItem) excluded.add(String(sourceItem.id));
+
+  // Cold start — no seeds at all
+  if (seeds.length === 0) {
+    let items = await fetchColdStart(signal);
+    if (type !== 'all') items = items.filter((i) => i.media_type === type);
+    if (selectedGenreId) {
+      items = items.filter((i) => i.genre_ids?.includes(selectedGenreId));
+    }
+    items = items.filter((i) => !excluded.has(String(i.id)));
+    return items.slice(0, limit);
   }
 
-  // Fetch candidates per genre (up to 20 per genre)
-  const candidateLists = await Promise.all(
-    genresToFetch.map((gId) => fetchCandidatesForGenre(gId, signal))
+  // Fan out: one TMDB request per seed
+  const seedResults = await Promise.allSettled(
+    seeds.map((s) => fetchRecommendationsForSeed(s.id, s.type, signal))
   );
 
-  // Merge candidates and dedupe by id
-  const candidateMap = new Map<string, MediaItem>();
-  candidateLists.flat().forEach((item) => {
-    const key = `${item.media_type}-${item.id}`;
-    if (!candidateMap.has(key)) {
-      candidateMap.set(key, item);
-    }
+  // Score by endorsement count + weighted popularity + rating
+  const scoreMap = new Map<
+    string,
+    { item: MediaItem; endorseCount: number; seedWeightSum: number }
+  >();
+
+  seedResults.forEach((res, idx) => {
+    if (res.status !== 'fulfilled') return;
+    const seedWeight = seeds[idx].weight;
+
+    res.value.forEach((item) => {
+      const key = `${item.media_type}-${item.id}`;
+      const existing = scoreMap.get(key);
+      if (existing) {
+        existing.endorseCount += 1;
+        existing.seedWeightSum += seedWeight;
+      } else {
+        scoreMap.set(key, {
+          item,
+          endorseCount: 1,
+          seedWeightSum: seedWeight,
+        });
+      }
+    });
   });
 
-  // Filter candidates:
-  let filtered = Array.from(candidateMap.values());
+  // Score = endorsement (dominant) + rating + popularity + recency
+  const scored = Array.from(scoreMap.values()).map(({ item, endorseCount, seedWeightSum }) => {
+    const endorsementScore = endorseCount * 10 + seedWeightSum * 2;
+    const ratingScore = (item.vote_average ?? 0) * 0.8;
+    const popularityScore = Math.log10((item.popularity ?? 0) + 1) * 1.5;
+    const dateStr = (item as any).release_date || (item as any).first_air_date;
+    const years = dateStr
+      ? (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24 * 365)
+      : 20;
+    const recencyScore = Math.max(0, 2 - years * 0.1);
+    const voteConfidence = Math.log10((item.vote_count ?? 0) + 1);
 
-  // Filter by media type if requested
-  if (type !== 'all') {
-    filtered = filtered.filter((item) => item.media_type === type);
+    const total =
+      endorsementScore +
+      ratingScore +
+      popularityScore +
+      recencyScore +
+      voteConfidence * 0.5;
+
+    return { item, score: total };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+
+  // Apply filters after ranking
+  let filtered = scored.map((s) => s.item);
+  if (type !== 'all') filtered = filtered.filter((i) => i.media_type === type);
+  if (selectedGenreId) {
+    filtered = filtered.filter((i) => i.genre_ids?.includes(selectedGenreId));
+  }
+  filtered = filtered.filter((i) => !excluded.has(String(i.id)));
+
+  // If over-filtered, relax: drop the genre filter but keep type + exclusions
+  if (filtered.length < 6 && selectedGenreId) {
+    filtered = scored.map((s) => s.item);
+    if (type !== 'all') filtered = filtered.filter((i) => i.media_type === type);
+    filtered = filtered.filter((i) => !excluded.has(String(i.id)));
   }
 
-  // Remove titles in watchlist, watched history, or opened in last 7 days
-  filtered = filtered.filter((item) => !excludedIds.has(String(item.id)));
-
-  // If exclusions left too few results, re-include some candidates rather than returning empty
+  // If still too few, add cold-start results to fill
   if (filtered.length < 6) {
-    filtered = Array.from(candidateMap.values());
-    if (type !== 'all') {
-      filtered = filtered.filter((item) => item.media_type === type);
-    }
-    if (sourceItem) {
-      filtered = filtered.filter((item) => String(item.id) !== String(sourceItem.id));
+    const fill = await fetchColdStart(signal);
+    for (const item of fill) {
+      const key = String(item.id);
+      if (excluded.has(key)) continue;
+      if (type !== 'all' && item.media_type !== type) continue;
+      if (!filtered.some((f) => String(f.id) === key)) {
+        filtered.push(item);
+      }
+      if (filtered.length >= limit) break;
     }
   }
-
-  // Sort by vote_average desc, then by popularity desc
-  filtered.sort((a, b) => {
-    const diff = (b.vote_average || 0) - (a.vote_average || 0);
-    if (Math.abs(diff) > 0.05) {
-      return diff;
-    }
-    return (b.popularity || 0) - (a.popularity || 0);
-  });
 
   return filtered.slice(0, limit);
 }
