@@ -11,6 +11,7 @@ import { useUIStore, NavTab } from './stores/useUIStore';
 import { useWatchlist } from './stores/watchlist';
 import { useDetails } from './lib/api';
 
+
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { CommandPalette } from './components/CommandPalette';

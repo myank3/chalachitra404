@@ -31,8 +31,11 @@ import { recordHistory } from '../lib/recommend';
 import { Mascot } from '../components/Mascot';
 
 interface DetailPageProps {
+  
   type?: MediaType;
+  
 }
+
 
 /* ────────────────────────────────────────────────
    Static maps
@@ -224,22 +227,26 @@ const PersonPopupShell: React.FC<{
     const r = el.getBoundingClientRect();
     const GAP = 10;
     const MARGIN = 12;
+    
+    // On mobile, constrain width to viewport
+    const isMobile = window.innerWidth < 640;
+    const currentW = isMobile ? Math.min(window.innerWidth - MARGIN * 2, POPUP_W) : POPUP_W;
 
     const spaceRight = window.innerWidth - r.right;
     const spaceLeft = r.left;
     const side: Side =
-      spaceRight >= POPUP_W + GAP + MARGIN || spaceRight >= spaceLeft
+      spaceRight >= currentW + GAP + MARGIN || spaceRight >= spaceLeft
         ? 'right'
         : 'left';
 
     let left: number;
     if (side === 'right') {
       left = r.right + GAP;
-      if (left + POPUP_W > window.innerWidth - MARGIN) {
-        left = window.innerWidth - POPUP_W - MARGIN;
+      if (left + currentW > window.innerWidth - MARGIN) {
+        left = window.innerWidth - currentW - MARGIN;
       }
     } else {
-      left = r.left - GAP - POPUP_W;
+      left = r.left - GAP - currentW;
       if (left < MARGIN) left = MARGIN;
     }
 
@@ -258,12 +265,17 @@ const PersonPopupShell: React.FC<{
       onClose();
     };
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // Close on scroll for mobile to prevent detached popups
+    const onScroll = () => onClose();
 
     document.addEventListener('mousedown', onClick);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
+
     return () => {
       document.removeEventListener('mousedown', onClick);
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScroll, { capture: true });
     };
   }, [open, onClose, anchorRef]);
 
@@ -275,7 +287,7 @@ const PersonPopupShell: React.FC<{
       role="dialog"
       data-side={layout.side}
       className="dream-pop fixed z-[100]
-                 w-[300px] max-w-[calc(100vw-24px)]
+                 w-[calc(100vw-24px)] max-w-[300px] sm:w-[300px]
                  rounded-xl
                  bg-[#141417]/95
                  border border-white/[0.12]
@@ -663,7 +675,7 @@ const PersonPopupBody: React.FC<{
           <button
             type="button"
             onClick={() => setTab('credits')}
-            className={`flex-1 py-1.5 text-[10px] font-medium tracking-wide transition-colors cursor-pointer ${
+            className={`flex-1 py-2 text-[10px] font-medium tracking-wide transition-colors cursor-pointer ${
               tab === 'credits'
                 ? 'text-white border-b-2 border-white -mb-px'
                 : 'text-white/45 hover:text-white/70'
@@ -674,7 +686,7 @@ const PersonPopupBody: React.FC<{
           <button
             type="button"
             onClick={() => setTab('imdb')}
-            className={`flex-1 py-1.5 text-[10px] font-medium tracking-wide transition-colors cursor-pointer ${
+            className={`flex-1 py-2 text-[10px] font-medium tracking-wide transition-colors cursor-pointer ${
               tab === 'imdb'
                 ? 'text-[#f5c518] border-b-2 border-[#f5c518] -mb-px'
                 : 'text-white/45 hover:text-[#f5c518]/80'
@@ -686,7 +698,7 @@ const PersonPopupBody: React.FC<{
       )}
 
       {/* Content — cast always shows IMDb; directors respect tab */}
-      <div className="max-h-[240px] overflow-y-auto no-scrollbar">
+      <div className="max-h-[240px] overflow-y-auto no-scrollbar overscroll-contain touch-pan-y">
         {isLoading ? (
           <PopupSkeleton />
         ) : variant === 'cast' ? (
@@ -718,7 +730,6 @@ const DirectorCard: React.FC<{ director: any }> = ({ director }) => {
     gcTime: 1000 * 60 * 60 * 2,
   });
 
-  // ✅ Label reflects job — "Director" for movies, "Creator" for TV
   const roleLabel = director.job ?? 'Director';
 
   return (
@@ -730,10 +741,10 @@ const DirectorCard: React.FC<{ director: any }> = ({ director }) => {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={`${roleLabel} ${director.name} — view details`}
-        className="group relative inline-flex items-center gap-2 pl-1 pr-3 py-0.5 rounded-full
-                   bg-[#7c5cff]/15 hover:bg-[#7c5cff]/25
+        className="group relative inline-flex items-center gap-2 pl-1 pr-3 py-1.5 sm:py-0.5 rounded-full
+                   bg-[#7c5cff]/15 hover:bg-[#7c5cff]/25 active:bg-[#7c5cff]/35
                    border border-[#7c5cff]/50 hover:border-[#7c5cff]/90
-                   transition-colors duration-200 cursor-pointer"
+                   transition-all duration-200 cursor-pointer active:scale-95"
       >
         <span className="relative w-6 h-6 rounded-full overflow-hidden ring-2 ring-[#7c5cff]/70 shrink-0">
           {director.profile_path ? (
@@ -803,7 +814,7 @@ const CastCard: React.FC<{ actor: any }> = ({ actor }) => {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={`${actor.name} — view details`}
-        className="group flex flex-col items-center w-20 shrink-0 text-center cursor-pointer focus:outline-none"
+        className="group flex flex-col items-center w-[72px] sm:w-20 shrink-0 text-center cursor-pointer focus:outline-none snap-start active:scale-95 transition-transform"
       >
         <span
           className="relative w-14 h-14 rounded-full overflow-hidden bg-neutral-800
@@ -853,9 +864,6 @@ const CastCard: React.FC<{ actor: any }> = ({ actor }) => {
 /* ────────────────────────────────────────────────
    Genre chip
    ──────────────────────────────────────────────── */
-/* ────────────────────────────────────────────────
-   Genre chip
-   ──────────────────────────────────────────────── */
 const GenreChip: React.FC<{
   genre: { id: number; name: string };
   type: MediaType;
@@ -865,10 +873,10 @@ const GenreChip: React.FC<{
     <button
       type="button"
       onClick={() => navigate(`/genres?genre=${genre.id}&type=${type}`)}
-      className="px-2.5 py-1 rounded-md bg-white/[0.05] hover:bg-[#7c5cff]/20
+      className="px-3 py-1.5 sm:py-1 rounded-md bg-white/[0.05] hover:bg-[#7c5cff]/20 active:bg-[#7c5cff]/30
                  border border-white/[0.08] hover:border-[#7c5cff]/50
                  text-xs text-[rgba(245,245,247,0.85)] hover:text-white
-                 font-medium transition-colors cursor-pointer"
+                 font-medium transition-all cursor-pointer active:scale-95"
     >
       {genre.name}
     </button>
@@ -972,7 +980,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
     return null;
   }, [item]);
 
-  /* ✅ FIX: TV shows → created_by; Movies → Director from crew */
   const primaryCredits = useMemo(() => {
     if (!item) return [];
 
@@ -986,7 +993,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
           job: 'Creator',
         }));
       }
-      // Fallback for older TV entries where created_by is empty
       const tvCrew = ((item.credits as any)?.crew ?? []) as any[];
       const fallback = tvCrew.filter(
         (c) =>
@@ -997,7 +1003,6 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
       return fallback.slice(0, 3).map((c) => ({ ...c, job: 'Creator' }));
     }
 
-    // Movies → Director
     return ((item?.credits as any)?.crew ?? [])
       .filter((c: any) => c.job === 'Director')
       .slice(0, 3);
@@ -1026,7 +1031,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0b] text-[#f5f5f7] flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-[#0a0a0b] text-[#f5f5f7] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Mascot state="loading" size={48} />
           <span className="text-xs text-[rgba(245,245,247,0.5)]">
@@ -1039,7 +1044,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
 
   if (!item) {
     return (
-      <div className="min-h-screen bg-[#0a0a0b] text-[#f5f5f7] px-6 py-16 text-center">
+      <div className="min-h-[100dvh] bg-[#0a0a0b] text-[#f5f5f7] px-6 py-16 text-center">
         <h2 className="text-xl font-semibold mb-2">Title Not Found</h2>
         <p className="text-xs text-[rgba(245,245,247,0.6)] mb-6">
           The requested movie or series could not be located.
@@ -1062,12 +1067,12 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
     : '2026';
 
   return (
-    <div className="min-h-screen bg-[#0a0a0b] text-[#f5f5f7] pb-24">
+    <div className="min-h-[100dvh] bg-[#0a0a0b] text-[#f5f5f7] pb-[calc(6rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-3">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 text-sm text-[rgba(245,245,247,0.62)] hover:text-white transition-colors cursor-pointer"
+          className="inline-flex items-center gap-2 text-sm text-[rgba(245,245,247,0.62)] hover:text-white active:scale-95 transition-all cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4 stroke-[1.5]" />
           <span>Back</span>
@@ -1091,40 +1096,30 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
             <div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-[#111113]/70 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-r from-[#111113]/90 via-[#111113]/40 to-transparent" />
 
-            <div className="absolute inset-0 flex flex-col justify-end p-6 sm:p-10">
+            <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-10">
               <div className="max-w-3xl">
-                <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.62)] mb-2">
+                <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.62)] mb-2">
                   <span className="text-white capitalize">
                     {type === 'tv' ? 'TV Series' : 'Movie'}
                   </span>
-                  <span aria-hidden="true" className="text-white/20">
-                    ·
-                  </span>
+                  <span aria-hidden="true" className="text-white/20">·</span>
                   <span className="flex items-center gap-1 font-mono tabular-nums text-white/90">
                     <Star className="w-3 h-3 text-amber-400 stroke-[1.5]" />
                     <span>
-                      {item.vote_average
-                        ? item.vote_average.toFixed(1)
-                        : '8.0'}
+                      {item.vote_average ? item.vote_average.toFixed(1) : '8.0'}
                     </span>
                   </span>
-                  <span aria-hidden="true" className="text-white/20">
-                    ·
-                  </span>
+                  <span aria-hidden="true" className="text-white/20">·</span>
                   <span className="tabular-nums">{releaseYear}</span>
                   {item.runtime && (
                     <>
-                      <span aria-hidden="true" className="text-white/20">
-                        ·
-                      </span>
+                      <span aria-hidden="true" className="text-white/20">·</span>
                       <span className="tabular-nums">{item.runtime}m</span>
                     </>
                   )}
                   {item.number_of_seasons && (
                     <>
-                      <span aria-hidden="true" className="text-white/20">
-                        ·
-                      </span>
+                      <span aria-hidden="true" className="text-white/20">·</span>
                       <span className="tabular-nums">
                         {item.number_of_seasons}{' '}
                         {item.number_of_seasons === 1 ? 'Season' : 'Seasons'}
@@ -1133,19 +1128,18 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                   )}
                 </div>
 
-                <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#f5f5f7] font-heading tracking-[-0.02em] leading-tight mb-2">
+                <h1 className="text-2xl sm:text-4xl md:text-5xl font-semibold text-[#f5f5f7] font-heading tracking-[-0.02em] leading-tight mb-2">
                   {item.title}
                 </h1>
 
                 {item.tagline && (
-                  <p className="text-xs sm:text-sm italic text-[rgba(245,245,247,0.62)] mb-3">
+                  <p className="text-xs sm:text-sm italic text-[rgba(245,245,247,0.62)] mb-3 line-clamp-2 sm:line-clamp-none">
                     "{item.tagline}"
                   </p>
                 )}
 
-                {/* ✅ Renders Creator for TV, Director for movies */}
                 {primaryCredits.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-3">
                     {primaryCredits.map((d: any) => (
                       <DirectorCard key={d.id} director={d} />
                     ))}
@@ -1162,7 +1156,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                         navigate(`/watch/tv/${id}?s=1&e=1`);
                       }
                     }}
-                    className="px-5 py-2.5 rounded-xl bg-[#7c5cff] text-white font-semibold text-xs hover:bg-[#8f72ff] active:scale-[0.97] transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                    className="px-5 py-2.5 rounded-xl bg-[#7c5cff] text-white font-semibold text-xs hover:bg-[#8f72ff] active:scale-95 transition-all flex items-center gap-2 cursor-pointer shadow-md"
                   >
                     <Play className="w-3.5 h-3.5 fill-current stroke-[1.5]" />
                     <span>Watch Now</span>
@@ -1177,7 +1171,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                         const e = progress?.episode ?? 1;
                         navigate(`/watch/tv/${id}?s=${s}&e=${e}`);
                       }}
-                      className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-[0.98] border border-white/[0.15] text-white font-medium text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] active:scale-95 border border-white/[0.15] text-white font-medium text-xs transition-all flex items-center gap-1.5 cursor-pointer"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 stroke-[1.5]" />
                       <span>
@@ -1205,7 +1199,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                     <button
                       type="button"
                       onClick={() => setShowTrailer(!showTrailer)}
-                      className="px-3.5 py-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] active:scale-[0.98] border border-white/[0.08] text-white text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="px-3.5 py-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] active:scale-95 border border-white/[0.08] text-white text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer"
                     >
                       <Video className="w-3.5 h-3.5 stroke-[1.5]" />
                       <span>{showTrailer ? 'Hide Trailer' : 'Trailer'}</span>
@@ -1219,16 +1213,16 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
           {showTrailer && trailer && (
             <div className="p-4 sm:p-6 border-t border-white/[0.08] bg-[#17171a]">
               <div className="flex items-center justify-between mb-3 text-[11px] text-[rgba(245,245,247,0.62)] font-medium uppercase tracking-[0.08em]">
-                <span>
+                <span className="truncate mr-4">
                   Official Trailer: {trailer.name}
-                  <span className="ml-2 text-white/30 normal-case tracking-normal">
+                  <span className="ml-2 text-white/30 normal-case tracking-normal hidden sm:inline">
                     via {trailer.site}
                   </span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowTrailer(false)}
-                  className="text-white/40 hover:text-white cursor-pointer"
+                  className="text-white/40 hover:text-white shrink-0 cursor-pointer px-2 py-1"
                 >
                   Close
                 </button>
@@ -1240,7 +1234,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                   src={trailer.src}
                   title={trailer.name}
                   className="w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; playsinline"
                   referrerPolicy="strict-origin-when-cross-origin"
                   allowFullScreen
                 />
@@ -1251,7 +1245,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                   href={trailer.externalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] text-white/45 hover:text-white/80 transition-colors"
+                  className="text-[11px] text-white/45 hover:text-white/80 transition-colors py-2 inline-block"
                 >
                   Trailer not playing? Open in a new tab →
                 </a>
@@ -1259,7 +1253,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
             </div>
           )}
 
-          <div className="p-6 sm:p-8 space-y-7">
+          <div className="p-4 sm:p-8 space-y-6 sm:space-y-7">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-2 space-y-3">
                 <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)]">
@@ -1291,13 +1285,14 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                 <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)] mb-3">
                   Top Cast
                 </h3>
-                <div className="flex gap-4 overflow-x-auto no-scrollbar py-1">
-                  {topCast.map((actor) => (
-                    <CastCard
-                      key={actor.id ?? actor.credit_id ?? actor.name}
-                      actor={actor}
-                    />
-                  ))}
+                <div className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar py-1 snap-x snap-mandatory">
+                  {topCast.map((actor: any) => (
+  <CastCard
+    key={actor.id ?? actor.credit_id ?? actor.name}
+    actor={actor}
+  />
+))}
+
                 </div>
               </div>
             )}
@@ -1305,8 +1300,8 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
         </div>
 
         {type === 'tv' && (
-          <div className="mt-8 rounded-2xl bg-[#111113] border border-white/[0.08] p-6 sm:p-8">
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-white/[0.08]">
+          <div className="mt-6 sm:mt-8 rounded-2xl bg-[#111113] border border-white/[0.08] p-4 sm:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-5 pb-4 border-b border-white/[0.08]">
               <div>
                 <h2 className="text-xl font-semibold tracking-[-0.02em] text-[#f5f5f7]">
                   Episodes
@@ -1319,14 +1314,14 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
               </div>
 
               {availableSeasons.length > 0 && (
-                <div className="relative inline-block">
+                <div className="relative inline-block w-full sm:w-auto">
                   <select
                     value={selectedSeason}
                     onChange={(e) =>
                       setSelectedSeason(Number(e.target.value))
                     }
                     aria-label="Select Season"
-                    className="appearance-none bg-[#17171a] border border-white/[0.12] rounded-lg px-4 py-2 pr-9 text-xs font-medium text-white cursor-pointer hover:border-white/25 focus:outline-none focus:border-white/40"
+                    className="w-full sm:w-auto appearance-none bg-[#17171a] border border-white/[0.12] rounded-lg px-4 py-2.5 sm:py-2 pr-9 text-xs font-medium text-white cursor-pointer hover:border-white/25 focus:outline-none focus:border-white/40"
                   >
                     {availableSeasons.map((s) => (
                       <option
@@ -1369,7 +1364,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                           `/watch/tv/${id}?s=${selectedSeason}&e=${ep.episode_number}`
                         )
                       }
-                      className={`group relative rounded-xl p-3 border transition-colors cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+                      className={`group relative rounded-xl p-3 border transition-colors cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 active:scale-[0.99] ${
                         isResumeTarget
                           ? 'bg-[#17171a] border-white/[0.1] border-l-4 border-l-[#7c5cff]'
                           : 'bg-[#17171a] border-white/[0.08] hover:bg-white/[0.04] hover:border-white/[0.14]'
@@ -1410,7 +1405,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                               {ep.name || `Episode ${ep.episode_number}`}"
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-[11px] text-[rgba(245,245,247,0.45)] font-mono mb-1.5">
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-[rgba(245,245,247,0.45)] font-mono mb-1.5">
                             {ep.runtime && <span>{ep.runtime}m</span>}
                             {ep.air_date && <span>· Aired {ep.air_date}</span>}
                             {ep.vote_average > 0 && (
@@ -1431,10 +1426,10 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                             `/watch/tv/${id}?s=${selectedSeason}&e=${ep.episode_number}`
                           );
                         }}
-                        className={`shrink-0 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+                        className={`shrink-0 px-4 py-2 sm:py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto mt-2 sm:mt-0 ${
                           isResumeTarget
-                            ? 'bg-white text-black hover:bg-[#e8e8ea]'
-                            : 'bg-white/[0.08] hover:bg-white text-white hover:text-black border border-white/[0.1]'
+                            ? 'bg-white text-black hover:bg-[#e8e8ea] active:bg-[#d4d4d8]'
+                            : 'bg-white/[0.08] hover:bg-white text-white hover:text-black border border-white/[0.1] active:bg-[#d4d4d8]'
                         }`}
                       >
                         <Play className="w-3 h-3 fill-current stroke-[1.5]" />
@@ -1449,18 +1444,18 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
         )}
 
         {relatedForGrid.length > 0 && (
-          <div className="mt-8 rounded-2xl bg-[#111113] border border-white/[0.08] p-6 sm:p-8">
+          <div className="mt-6 sm:mt-8 rounded-2xl bg-[#111113] border border-white/[0.08] p-4 sm:p-8">
             <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)] mb-4">
               {type === 'movie' && collectionId
                 ? 'More in this Collection'
                 : 'You May Also Like'}
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-3">
               {relatedForGrid.slice(0, 6).map((sim) => (
                 <div
                   key={`${sim.media_type}-${sim.id}`}
                   onClick={() => navigate(`/${sim.media_type || type}/${sim.id}`)}
-                  className="group cursor-pointer rounded-xl bg-[#17171a] p-2 border border-white/[0.08] hover:border-white/[0.18] transition-colors"
+                  className="group cursor-pointer rounded-xl bg-[#17171a] p-1.5 sm:p-2 border border-white/[0.08] hover:border-white/[0.18] active:scale-[0.97] transition-all"
                 >
                   <div className="aspect-[2/3] w-full rounded-lg overflow-hidden bg-neutral-900 mb-2">
                     {sim.poster_path ? (
@@ -1478,10 +1473,10 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                       </div>
                     )}
                   </div>
-                  <p className="text-xs font-medium text-[rgba(245,245,247,0.85)] truncate group-hover:text-white">
+                  <p className="text-xs font-medium text-[rgba(245,245,247,0.85)] truncate group-hover:text-white px-0.5">
                     {sim.title || sim.name}
                   </p>
-                  <span className="text-[10px] text-[rgba(245,245,247,0.4)]">
+                  <span className="text-[10px] text-[rgba(245,245,247,0.4)] px-0.5">
                     {sim.release_date
                       ? sim.release_date.substring(0, 4)
                       : sim.first_air_date

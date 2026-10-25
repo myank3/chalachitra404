@@ -1,3 +1,4 @@
+// src/lib/api.ts
 import { useQuery } from '@tanstack/react-query';
 import { MediaItem, MediaType } from '../types';
 import { MOCK_MEDIA_ITEMS } from '../data/mockData';
@@ -6,6 +7,23 @@ export const TMDB_API_KEY = '4885ba83e8fcc37c495a2e71ece8366d';
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/';
 
+/**
+ * All sizes supported by TMDB's image CDN.
+ * @see https://developer.themoviedb.org/docs/image-basics
+ */
+export type ImageSize =
+  | 'w45'
+  | 'w92'
+  | 'w154'
+  | 'w185'
+  | 'w200'
+  | 'w300'
+  | 'w342'
+  | 'w500'
+  | 'w780'
+  | 'w1280'
+  | 'original';
+
 export interface Genre {
   id: number;
   name: string;
@@ -13,7 +31,7 @@ export interface Genre {
 
 export const getImageUrl = (
   path: string | null | undefined,
-  size: 'w300' | 'w500' | 'w780' | 'w1280' | 'original' = 'w780'
+  size: ImageSize = 'w780'
 ): string => {
   if (!path) return '';
   if (path.startsWith('http')) return path;
@@ -400,15 +418,18 @@ export function useSearch(query: string) {
   });
 }
 
-export function useDetails(type: MediaType, id: string | number | null) {
+export function useDetails(
+  type: MediaType | null,
+  id: string | number | null
+) {
   return useQuery({
     queryKey: ['details', type, id],
-    queryFn: ({ signal }) => (id ? getDetails(type, id, signal) : null),
-    enabled: Boolean(id),
+    queryFn: ({ signal }) =>
+      id && type ? getDetails(type, id, signal) : null,
+    enabled: Boolean(id && type),
     staleTime: 1000 * 60 * 15,
   });
 }
-
 export function useSimilar(type: MediaType, id: string | number | null) {
   return useQuery({
     queryKey: ['similar', type, id],

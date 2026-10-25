@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Play,
@@ -9,6 +9,7 @@ import {
   Sparkles,
   TrendingUp,
   Flame,
+  Eye,
 } from 'lucide-react';
 import {
   useTrending,
@@ -61,11 +62,11 @@ function readHistoryFromStorage(): HistoryItem[] {
    ──────────────────────────────────────────────── */
 const CONTAINER = 'max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8';
 
-/* ⭐ Hero timings — snappier cadence */
+/* ⭐ Hero timings */
 const SLIDE_INTERVAL_MS = 5500;
-const SLIDE_FADE_MS = 700;      // was 1200 — much faster crossfade
-const CONTENT_EXIT_MS = 220;    // was 400
-const CONTENT_ENTER_MS = 420;   // was 700
+const SLIDE_FADE_MS = 700;
+const CONTENT_EXIT_MS = 220;
+const CONTENT_ENTER_MS = 420;
 
 /* ────────────────────────────────────────────────
    Hero
@@ -73,51 +74,50 @@ const CONTENT_ENTER_MS = 420;   // was 700
 const Hero: React.FC<{ items: any[] }> = ({ items }) => {
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
-  const [phase, setPhase] = useState<'idle' | 'exiting' | 'entering'>('idle');
   const timerRef = useRef<number | null>(null);
-  const phaseTimerRef = useRef<number | null>(null);
 
   const featured = items.slice(0, 5);
+  const count = featured.length;
 
-  const advance = (nextIndex: number) => {
-    if (phase !== 'idle') return;
-
-    setPhase('exiting');
-
-    phaseTimerRef.current = window.setTimeout(() => {
-      setIndex(nextIndex);
-      setPhase('entering');
-
-      phaseTimerRef.current = window.setTimeout(() => {
-        setPhase('idle');
-      }, CONTENT_ENTER_MS);
-    }, CONTENT_EXIT_MS);
-  };
-
+  /* Self-scheduling timer — no drift, no stale closures, always in sync
+     with the display's refresh. CSS animations on the backdrop run on
+     the compositor so 60/120/144/240 Hz all just work. */
   useEffect(() => {
-    if (featured.length < 2) return;
+    if (count < 2) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    timerRef.current = window.setInterval(() => {
-      setIndex((current) => {
-        const next = (current + 1) % featured.length;
-        advance(next);
-        return current;
-      });
-    }, SLIDE_INTERVAL_MS);
+    let cancelled = false;
+
+    const schedule = () => {
+      if (cancelled) return;
+      timerRef.current = window.setTimeout(() => {
+        if (cancelled) return;
+        setIndex((i) => (i + 1) % count);
+        schedule();
+      }, SLIDE_INTERVAL_MS);
+    };
+
+    schedule();
 
     return () => {
-      if (timerRef.current) window.clearInterval(timerRef.current);
-      if (phaseTimerRef.current) window.clearTimeout(phaseTimerRef.current);
+      cancelled = true;
+      if (timerRef.current) window.clearTimeout(timerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [featured.length]);
+  }, [count]);
 
-  const goToSlide = (i: number) => {
-    if (i === index || phase !== 'idle') return;
-    if (timerRef.current) window.clearInterval(timerRef.current);
-    advance(i);
-  };
+  const goToSlide = useCallback(
+    (i: number) => {
+      if (i === index) return;
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      setIndex(i);
+      if (count >= 2) {
+        timerRef.current = window.setTimeout(() => {
+          setIndex((cur) => (cur + 1) % count);
+        }, SLIDE_INTERVAL_MS);
+      }
+    },
+    [index, count]
+  );
 
   if (featured.length === 0) {
     return <div className="h-[70vh] bg-[#0a0a0b]" />;
@@ -132,10 +132,15 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
   const goToDetails = () =>
     navigate(type === 'movie' ? `/movie/${current.id}` : `/tv/${current.id}`);
 
+  const easeOut = [0.22, 1, 0.36, 1] as const;
+
   return (
     <section className="relative w-full h-[78vh] min-h-[560px]">
-      {/* ── BACKDROPS — stacked, crossfade ── */}
-      <div className="absolute inset-0 overflow-hidden">
+      {/* ── BACKDROPS — <img> on its own compositor layer ── */}
+      <div
+        className="absolute inset-0 overflow-hidden"
+        style={{ contain: 'paint' }}
+      >
         {featured.map((item, i) => {
           const bg = getImageUrl(item.backdrop_path, 'original');
           if (!bg) return null;
@@ -143,19 +148,34 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
           return (
             <div
               key={item.id}
-              className="absolute inset-0 bg-cover bg-center"
+              className="absolute inset-0"
               style={{
-                backgroundImage: `url(${bg})`,
                 opacity: isActive ? 1 : 0,
                 transition: `opacity ${SLIDE_FADE_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-                animation: isActive
-                  ? `heroKenBurns ${SLIDE_INTERVAL_MS + SLIDE_FADE_MS}ms linear forwards`
-                  : 'none',
                 willChange: 'opacity',
                 backfaceVisibility: 'hidden',
-                transform: 'translateZ(0)',
+                transform: 'translate3d(0,0,0)',
               }}
-            />
+              aria-hidden={!isActive}
+            >
+              <img
+                src={bg}
+                alt=""
+                loading="eager"
+                decoding="async"
+                fetchPriority={isActive ? 'high' : 'low'}
+                className="w-full h-full object-cover object-center select-none pointer-events-none"
+                draggable={false}
+                style={{
+                  animation: isActive
+                    ? `heroKenBurns ${SLIDE_INTERVAL_MS + SLIDE_FADE_MS}ms linear forwards`
+                    : 'none',
+                  willChange: isActive ? 'transform' : 'auto',
+                  backfaceVisibility: 'hidden',
+                  transform: 'translate3d(0,0,0)',
+                }}
+              />
+            </div>
           );
         })}
       </div>
@@ -176,21 +196,24 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
         }}
       />
 
-      {/* ── CONTENT — AnimatePresence for clean exit/enter ── */}
+      {/* ── CONTENT ── */}
       <div className={`relative h-full ${CONTAINER} flex items-end pb-16 lg:pb-24`}>
         <div className="relative max-w-2xl w-full">
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={current.id}
               initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
-              transition={{
-                duration:
-                  phase === 'exiting'
-                    ? CONTENT_EXIT_MS / 1000
-                    : CONTENT_ENTER_MS / 1000,
-                ease: [0.22, 1, 0.36, 1],
+              animate={{
+                opacity: 1,
+                y: 0,
+                filter: 'blur(0px)',
+                transition: { duration: CONTENT_ENTER_MS / 1000, ease: easeOut },
+              }}
+              exit={{
+                opacity: 0,
+                y: -10,
+                filter: 'blur(4px)',
+                transition: { duration: CONTENT_EXIT_MS / 1000, ease: easeOut },
               }}
             >
               {/* Badge */}
@@ -208,7 +231,7 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
               <motion.h1
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.03, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.4, delay: 0.03, ease: easeOut }}
                 className="text-[40px] sm:text-[52px] lg:text-[64px] font-bold text-white tracking-[-0.03em] leading-[0.95] mb-5"
               >
                 {title}
@@ -218,7 +241,7 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.36, delay: 0.07, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.36, delay: 0.07, ease: easeOut }}
                 className="flex items-center flex-wrap gap-x-4 gap-y-1.5 mb-5 text-[13px] text-[rgba(245,245,247,0.7)]"
               >
                 {year && <span>{year}</span>}
@@ -246,7 +269,7 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
                 <motion.p
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.36, delay: 0.11, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: 0.36, delay: 0.11, ease: easeOut }}
                   className="text-[15px] leading-[1.65] text-[rgba(245,245,247,0.78)] max-w-[560px] mb-7 line-clamp-3"
                 >
                   {current.overview}
@@ -257,7 +280,7 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.36, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.36, delay: 0.16, ease: easeOut }}
                 className="flex items-center gap-3"
               >
                 <button
@@ -310,6 +333,7 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
                     style={{
                       background: 'linear-gradient(90deg, #7c5cff, #ff6b9d)',
                       animation: `heroProgress ${SLIDE_INTERVAL_MS}ms linear forwards`,
+                      willChange: 'width',
                     }}
                   />
                 )}
@@ -321,8 +345,8 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
 
       <style>{`
         @keyframes heroKenBurns {
-          from { transform: scale(1.03) translate(0, 0); }
-          to   { transform: scale(1.08) translate(-0.8%, -0.8%); }
+          from { transform: scale(1.03) translate3d(0, 0, 0); }
+          to   { transform: scale(1.08) translate3d(-0.8%, -0.8%, 0); }
         }
         @keyframes heroProgress {
           from { width: 0%; }
@@ -336,6 +360,190 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
         }
       `}</style>
     </section>
+  );
+};
+
+/* ────────────────────────────────────────────────
+   Mobile trailer preview — long-press / peek button
+   Desktop: transparent pass-through (PC unchanged)
+   ──────────────────────────────────────────────── */
+function useTrailerPreview(item: any, enabled: boolean) {
+  const mediaType: 'movie' | 'tv' =
+    item?.media_type ?? (item?.title ? 'movie' : 'tv');
+
+  const { data } = useQuery({
+    queryKey: ['hover-trailer', mediaType, item?.id],
+    queryFn: () => getDetails(mediaType, item.id),
+    enabled: enabled && !!item?.id,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
+  });
+
+  return useMemo(() => {
+    const videos = (data as any)?.videos?.results ?? [];
+    return (
+      videos.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ??
+      videos.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer') ??
+      videos.find((v: any) => v.site === 'YouTube' && v.type === 'Teaser') ??
+      videos.find((v: any) => v.site === 'YouTube') ??
+      null
+    );
+  }, [data]);
+}
+
+const MobilePreviewCard: React.FC<{
+  item: any;
+  rank?: number;
+  index: number;
+}> = ({ item, rank, index }) => {
+  const [previewing, setPreviewing] = useState(false);
+  const pressTimer = useRef<number | null>(null);
+  const wasLongPressed = useRef(false);
+  const startPos = useRef<{ x: number; y: number } | null>(null);
+
+  const trailer = useTrailerPreview(item, previewing);
+
+  const cancelPress = useCallback(() => {
+    if (pressTimer.current) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    // Only intercept touch / pen. Desktop mouse keeps MovieCard's own hover.
+    if (e.pointerType === 'mouse') return;
+    startPos.current = { x: e.clientX, y: e.clientY };
+    wasLongPressed.current = false;
+    cancelPress();
+    pressTimer.current = window.setTimeout(() => {
+      wasLongPressed.current = true;
+      setPreviewing(true);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(15);
+      }
+    }, 450);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!startPos.current) return;
+    const dx = Math.abs(e.clientX - startPos.current.x);
+    const dy = Math.abs(e.clientY - startPos.current.y);
+    if (dx > 10 || dy > 10) cancelPress();
+  };
+
+  const closePreview = () => {
+    cancelPress();
+    startPos.current = null;
+    setPreviewing(false);
+  };
+
+  const onPointerUp = () => closePreview();
+  const onPointerCancel = () => closePreview();
+  const onPointerLeave = () => {
+    // Only on touch pointers — for mouse, ignore so PC stays untouched.
+    cancelPress();
+    setPreviewing(false);
+  };
+
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (wasLongPressed.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      wasLongPressed.current = false;
+    }
+  };
+
+  return (
+    <div
+      className="relative"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onPointerLeave={onPointerLeave}
+      onClickCapture={onClickCapture}
+      style={{ touchAction: 'manipulation' }}
+    >
+      <MovieCard item={item} rank={rank} index={index} />
+
+      {/* Peek button — mobile-only, easy discovery for tap-to-preview */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setPreviewing(true);
+        }}
+        aria-label="Preview trailer"
+        className="md:hidden absolute top-2 left-2 z-20 w-8 h-8 rounded-full
+                   bg-black/70 backdrop-blur-sm border border-white/25
+                   text-white flex items-center justify-center
+                   active:scale-90 transition-transform"
+      >
+        <Eye className="w-3.5 h-3.5" strokeWidth={2} />
+      </button>
+
+      <AnimatePresence>
+        {previewing && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute inset-0 z-30 rounded-xl overflow-hidden bg-black
+                       ring-2 ring-[#7c5cff]/60 shadow-2xl"
+          >
+            {trailer ? (
+              <iframe
+                src={
+                  `https://www.youtube-nocookie.com/embed/${trailer.key}` +
+                  `?autoplay=1&mute=1&modestbranding=1&playsinline=1` +
+                  `&controls=0&loop=1&playlist=${trailer.key}&rel=0`
+                }
+                className="w-full h-full border-0"
+                title={trailer.name || 'Trailer'}
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-white/60">
+                <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
+                <span className="text-[10px] uppercase tracking-widest">
+                  Loading
+                </span>
+              </div>
+            )}
+
+            {/* Bottom caption + close */}
+            <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/90 to-transparent pointer-events-none">
+              <p className="text-[11px] font-semibold text-white truncate">
+                {item.title || item.name}
+              </p>
+              <p className="text-[9px] text-white/60">
+                Muted preview · tap ✕ to close
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setPreviewing(false);
+              }}
+              aria-label="Close preview"
+              className="absolute top-2 right-2 w-7 h-7 rounded-full
+                         bg-black/80 text-white flex items-center justify-center
+                         text-xs active:scale-90 transition-transform"
+            >
+              ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 
@@ -414,7 +622,11 @@ const Row: React.FC<{
               key={`${item.media_type || 'x'}-${item.id}-${i}`}
               className="w-[160px] sm:w-[180px] shrink-0"
             >
-              <MovieCard item={item} rank={ranked ? i + 1 : undefined} index={i} />
+              <MobilePreviewCard
+                item={item}
+                rank={ranked ? i + 1 : undefined}
+                index={i}
+              />
             </div>
           ))}
         </div>
