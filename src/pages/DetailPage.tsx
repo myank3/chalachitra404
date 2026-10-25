@@ -31,11 +31,8 @@ import { recordHistory } from '../lib/recommend';
 import { Mascot } from '../components/Mascot';
 
 interface DetailPageProps {
-  
   type?: MediaType;
-  
 }
-
 
 /* ────────────────────────────────────────────────
    Static maps
@@ -227,7 +224,7 @@ const PersonPopupShell: React.FC<{
     const r = el.getBoundingClientRect();
     const GAP = 10;
     const MARGIN = 12;
-    
+
     // On mobile, constrain width to viewport
     const isMobile = window.innerWidth < 640;
     const currentW = isMobile ? Math.min(window.innerWidth - MARGIN * 2, POPUP_W) : POPUP_W;
@@ -1008,7 +1005,8 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
       .slice(0, 3);
   }, [item, type]);
 
-  const topCast = useMemo(
+  // Typed as any[] so the .map callback infers `actor: any` (fixes TS7006).
+  const topCast = useMemo<any[]>(
     () => ((item?.credits as any)?.cast ?? []).slice(0, 10),
     [item]
   );
@@ -1081,7 +1079,17 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="relative rounded-2xl bg-[#111113] border border-white/[0.08]">
-          <div className="relative aspect-[16/9] sm:aspect-[21/9] w-full bg-black overflow-hidden rounded-t-2xl">
+          {/*
+            ⭐ HERO BACKDROP
+            Mobile: min-h-[500px] — no aspect ratio. Gives the content
+            stack (badge + title + tagline + directors + buttons) real room
+            so nothing spills above the overflow-hidden edge and clips the
+            <h1>. Previous aspect-[16/9] at ~375px width was only ~211px
+            tall, which is why the movie name disappeared on Android.
+            Tablet+: aspect-[21/9] drives the height, and min-h-[380px] is
+            only a safety floor. PC layout is unchanged.
+          */}
+          <div className="relative min-h-[500px] sm:min-h-[380px] sm:aspect-[21/9] w-full bg-black overflow-hidden rounded-t-2xl">
             <img
               src={getImageUrl(
                 item.backdrop_path || item.poster_path,
@@ -1090,7 +1098,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
               alt={item.title}
               loading="eager"
               decoding="async"
-              className="w-full h-full object-cover object-center"
+              className="w-full h-full object-cover object-[center_30%] sm:object-center"
               referrerPolicy="no-referrer"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-[#111113]/70 to-transparent" />
@@ -1128,7 +1136,7 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                   )}
                 </div>
 
-                <h1 className="text-2xl sm:text-4xl md:text-5xl font-semibold text-[#f5f5f7] font-heading tracking-[-0.02em] leading-tight mb-2">
+                <h1 className="text-2xl sm:text-4xl md:text-5xl font-semibold text-[#f5f5f7] font-heading tracking-[-0.02em] leading-[1.05] mb-2">
                   {item.title}
                 </h1>
 
@@ -1286,13 +1294,12 @@ export const DetailPage: React.FC<DetailPageProps> = ({ type: propType }) => {
                   Top Cast
                 </h3>
                 <div className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar py-1 snap-x snap-mandatory">
-                  {topCast.map((actor: any) => (
-  <CastCard
-    key={actor.id ?? actor.credit_id ?? actor.name}
-    actor={actor}
-  />
-))}
-
+                  {topCast.map((actor) => (
+                    <CastCard
+                      key={actor.id ?? actor.credit_id ?? actor.name}
+                      actor={actor}
+                    />
+                  ))}
                 </div>
               </div>
             )}
