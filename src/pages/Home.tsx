@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Play,
@@ -9,7 +9,6 @@ import {
   Sparkles,
   TrendingUp,
   Flame,
-  Eye,
 } from 'lucide-react';
 import {
   useTrending,
@@ -364,190 +363,6 @@ const Hero: React.FC<{ items: any[] }> = ({ items }) => {
 };
 
 /* ────────────────────────────────────────────────
-   Mobile trailer preview — long-press / peek button
-   Desktop: transparent pass-through (PC unchanged)
-   ──────────────────────────────────────────────── */
-function useTrailerPreview(item: any, enabled: boolean) {
-  const mediaType: 'movie' | 'tv' =
-    item?.media_type ?? (item?.title ? 'movie' : 'tv');
-
-  const { data } = useQuery({
-    queryKey: ['hover-trailer', mediaType, item?.id],
-    queryFn: () => getDetails(mediaType, item.id),
-    enabled: enabled && !!item?.id,
-    staleTime: 1000 * 60 * 10,
-    gcTime: 1000 * 60 * 30,
-  });
-
-  return useMemo(() => {
-    const videos = (data as any)?.videos?.results ?? [];
-    return (
-      videos.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ??
-      videos.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer') ??
-      videos.find((v: any) => v.site === 'YouTube' && v.type === 'Teaser') ??
-      videos.find((v: any) => v.site === 'YouTube') ??
-      null
-    );
-  }, [data]);
-}
-
-const MobilePreviewCard: React.FC<{
-  item: any;
-  rank?: number;
-  index: number;
-}> = ({ item, rank, index }) => {
-  const [previewing, setPreviewing] = useState(false);
-  const pressTimer = useRef<number | null>(null);
-  const wasLongPressed = useRef(false);
-  const startPos = useRef<{ x: number; y: number } | null>(null);
-
-  const trailer = useTrailerPreview(item, previewing);
-
-  const cancelPress = useCallback(() => {
-    if (pressTimer.current) {
-      window.clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  }, []);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    // Only intercept touch / pen. Desktop mouse keeps MovieCard's own hover.
-    if (e.pointerType === 'mouse') return;
-    startPos.current = { x: e.clientX, y: e.clientY };
-    wasLongPressed.current = false;
-    cancelPress();
-    pressTimer.current = window.setTimeout(() => {
-      wasLongPressed.current = true;
-      setPreviewing(true);
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(15);
-      }
-    }, 450);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!startPos.current) return;
-    const dx = Math.abs(e.clientX - startPos.current.x);
-    const dy = Math.abs(e.clientY - startPos.current.y);
-    if (dx > 10 || dy > 10) cancelPress();
-  };
-
-  const closePreview = () => {
-    cancelPress();
-    startPos.current = null;
-    setPreviewing(false);
-  };
-
-  const onPointerUp = () => closePreview();
-  const onPointerCancel = () => closePreview();
-  const onPointerLeave = () => {
-    // Only on touch pointers — for mouse, ignore so PC stays untouched.
-    cancelPress();
-    setPreviewing(false);
-  };
-
-  const onClickCapture = (e: React.MouseEvent) => {
-    if (wasLongPressed.current) {
-      e.preventDefault();
-      e.stopPropagation();
-      wasLongPressed.current = false;
-    }
-  };
-
-  return (
-    <div
-      className="relative"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      onPointerLeave={onPointerLeave}
-      onClickCapture={onClickCapture}
-      style={{ touchAction: 'manipulation' }}
-    >
-      <MovieCard item={item} rank={rank} index={index} />
-
-      {/* Peek button — mobile-only, easy discovery for tap-to-preview */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setPreviewing(true);
-        }}
-        aria-label="Preview trailer"
-        className="md:hidden absolute top-2 left-2 z-20 w-8 h-8 rounded-full
-                   bg-black/70 backdrop-blur-sm border border-white/25
-                   text-white flex items-center justify-center
-                   active:scale-90 transition-transform"
-      >
-        <Eye className="w-3.5 h-3.5" strokeWidth={2} />
-      </button>
-
-      <AnimatePresence>
-        {previewing && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0 z-30 rounded-xl overflow-hidden bg-black
-                       ring-2 ring-[#7c5cff]/60 shadow-2xl"
-          >
-            {trailer ? (
-              <iframe
-                src={
-                  `https://www.youtube-nocookie.com/embed/${trailer.key}` +
-                  `?autoplay=1&mute=1&modestbranding=1&playsinline=1` +
-                  `&controls=0&loop=1&playlist=${trailer.key}&rel=0`
-                }
-                className="w-full h-full border-0"
-                title={trailer.name || 'Trailer'}
-                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-white/60">
-                <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
-                <span className="text-[10px] uppercase tracking-widest">
-                  Loading
-                </span>
-              </div>
-            )}
-
-            {/* Bottom caption + close */}
-            <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/90 to-transparent pointer-events-none">
-              <p className="text-[11px] font-semibold text-white truncate">
-                {item.title || item.name}
-              </p>
-              <p className="text-[9px] text-white/60">
-                Muted preview · tap ✕ to close
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setPreviewing(false);
-              }}
-              aria-label="Close preview"
-              className="absolute top-2 right-2 w-7 h-7 rounded-full
-                         bg-black/80 text-white flex items-center justify-center
-                         text-xs active:scale-90 transition-transform"
-            >
-              ✕
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
-/* ────────────────────────────────────────────────
    Row
    ──────────────────────────────────────────────── */
 const Row: React.FC<{
@@ -622,7 +437,7 @@ const Row: React.FC<{
               key={`${item.media_type || 'x'}-${item.id}-${i}`}
               className="w-[160px] sm:w-[180px] shrink-0"
             >
-              <MobilePreviewCard
+              <MovieCard
                 item={item}
                 rank={ranked ? i + 1 : undefined}
                 index={i}
