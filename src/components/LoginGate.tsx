@@ -58,7 +58,10 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative min-h-screen bg-[#08080a] text-[#f5f5f7] flex items-center justify-center p-6 overflow-hidden">
-      {/* ═══ Animated backdrop — unchanged from working version ═══ */}
+      {/* ═══════════════════════════════════════════
+          BACKDROP — 7 orbs, purple / pink / gold only
+          No teal. Every orb drifts a different way.
+          ═══════════════════════════════════════════ */}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 overflow-hidden"
@@ -66,6 +69,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
       >
         <div className="absolute inset-0 bg-[#08080a]" />
 
+        {/* 1 — violet, up-left */}
         <div
           className="absolute -top-[12%] -left-[8%] w-[540px] h-[540px] rounded-full
                      animate-[driftUpLeft_22s_ease-in-out_infinite]"
@@ -75,6 +79,8 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
             transform: 'translate3d(0,0,0)',
           }}
         />
+
+        {/* 2 — pink, down-right */}
         <div
           className="absolute -bottom-[14%] -right-[10%] w-[540px] h-[540px] rounded-full
                      animate-[driftDownRight_26s_ease-in-out_infinite]"
@@ -84,17 +90,21 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
             transform: 'translate3d(0,0,0)',
           }}
         />
+
+        {/* 3 — light purple, drifts right (replaces teal) */}
         <div
-          className="absolute top-[32%] left-[48%] w-[440px] h-[440px] rounded-full
+          className="absolute top-[28%] left-[44%] w-[460px] h-[460px] rounded-full
                      animate-[driftRight_30s_ease-in-out_infinite]"
           style={{
             background:
-              'radial-gradient(circle, rgba(94,234,212,0.65) 0%, rgba(94,234,212,0.22) 32%, rgba(94,234,212,0) 70%)',
+              'radial-gradient(circle, rgba(184,164,255,0.7) 0%, rgba(184,164,255,0.25) 32%, rgba(184,164,255,0) 70%)',
             transform: 'translate3d(0,0,0)',
           }}
         />
+
+        {/* 4 — deep violet, drifts left */}
         <div
-          className="absolute bottom-[4%] left-[6%] w-[500px] h-[500px] rounded-full
+          className="absolute bottom-[4%] left-[4%] w-[520px] h-[520px] rounded-full
                      animate-[driftLeft_24s_ease-in-out_infinite]"
           style={{
             background:
@@ -103,6 +113,40 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           }}
         />
 
+        {/* 5 — champagne gold, drifts down */}
+        <div
+          className="absolute top-[2%] right-[6%] w-[500px] h-[500px] rounded-full
+                     animate-[driftDown_28s_ease-in-out_infinite]"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(212,185,110,0.55) 0%, rgba(212,185,110,0.2) 32%, rgba(212,185,110,0) 70%)',
+            transform: 'translate3d(0,0,0)',
+          }}
+        />
+
+        {/* 6 — magenta, drifts up */}
+        <div
+          className="absolute bottom-[12%] right-[16%] w-[440px] h-[440px] rounded-full
+                     animate-[driftUp_20s_ease-in-out_infinite]"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(200,77,208,0.65) 0%, rgba(200,77,208,0.22) 32%, rgba(200,77,208,0) 70%)',
+            transform: 'translate3d(0,0,0)',
+          }}
+        />
+
+        {/* 7 — soft pink, diagonal drift */}
+        <div
+          className="absolute top-[38%] left-[6%] w-[380px] h-[380px] rounded-full
+                     animate-[driftDiag_32s_ease-in-out_infinite]"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(255,141,179,0.55) 0%, rgba(255,141,179,0.18) 32%, rgba(255,141,179,0) 70%)',
+            transform: 'translate3d(0,0,0)',
+          }}
+        />
+
+        {/* Vignette */}
         <div
           className="absolute inset-0"
           style={{
@@ -112,24 +156,30 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
         />
       </div>
 
-      {/* ═══ Card ═══ */}
+      {/* ═══════════════════════════════════════════
+          CARD
+          ═══════════════════════════════════════════ */}
       <div className="relative w-full max-w-[400px] animate-[gateIn_600ms_cubic-bezier(0.16,1,0.3,1)_both]">
-        {/* Ornament above */}
+        {/* Ornament */}
         <div className="flex items-center justify-center gap-4 mb-10">
           <span className="h-px w-16 bg-gradient-to-r from-transparent to-[#d4b96e]/40" />
           <svg width="10" height="10" viewBox="0 0 10 10" className="text-[#d4b96e]">
-            <path d="M5 0 L6.5 3.5 L10 5 L6.5 6.5 L5 10 L3.5 6.5 L0 5 L3.5 3.5 Z" fill="currentColor" opacity="0.7" />
+            <path
+              d="M5 0 L6.5 3.5 L10 5 L6.5 6.5 L5 10 L3.5 6.5 L0 5 L3.5 3.5 Z"
+              fill="currentColor"
+              opacity="0.7"
+            />
           </svg>
           <span className="h-px w-16 bg-gradient-to-l from-transparent to-[#d4b96e]/40" />
         </div>
 
-        {/* Wordmark */}
+        {/* Orbital's + wordmark */}
         <div className="text-center mb-2">
           <p
             className="text-[8.5px] uppercase tracking-[0.5em] text-[#d4b96e]/70 mb-4"
             style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 600 }}
           >
-            Maison
+            Orbital's
           </p>
           <h1
             className="text-[44px] leading-none text-transparent bg-clip-text bg-gradient-to-b from-white via-white/95 to-white/60"
@@ -143,7 +193,6 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           </h1>
         </div>
 
-        {/* Sub-wordmark */}
         <p
           className="text-center text-[10px] uppercase tracking-[0.4em] text-white/40 mt-5 mb-12"
           style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
@@ -153,7 +202,6 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 
         {/* Form */}
         <form onSubmit={submit} className="space-y-10">
-          {/* Access key — underline only, no box */}
           <div className="relative">
             <label
               htmlFor="access-key"
@@ -201,7 +249,6 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
             </p>
           )}
 
-          {/* Button — hairline gold, fills on hover */}
           <button
             type="submit"
             disabled={busy || !key}
@@ -236,7 +283,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           </button>
         </form>
 
-        {/* Footer ornament */}
+        {/* Footer */}
         <div className="mt-16">
           <div className="flex items-center justify-center gap-3 mb-5">
             <span className="h-px w-8 bg-white/15" />
@@ -257,6 +304,8 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           from { opacity: 0; transform: translate3d(0, 16px, 0) scale(0.97); }
           to   { opacity: 1; transform: translate3d(0, 0, 0)    scale(1); }
         }
+
+        /* Transform-only drifts — 144Hz safe, no freeze */
         @keyframes driftUpLeft {
           0%   { transform: translate3d(0, 0, 0) scale(1); }
           50%  { transform: translate3d(-90px, -120px, 0) scale(1.15); }
@@ -277,6 +326,22 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           50%  { transform: translate3d(-150px, 0, 0) scale(1.18); }
           100% { transform: translate3d(0, 0, 0) scale(1); }
         }
+        @keyframes driftDown {
+          0%   { transform: translate3d(0, 0, 0) scale(1); }
+          50%  { transform: translate3d(0, 140px, 0) scale(1.14); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
+        }
+        @keyframes driftUp {
+          0%   { transform: translate3d(0, 0, 0) scale(1); }
+          50%  { transform: translate3d(0, -140px, 0) scale(1.16); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
+        }
+        @keyframes driftDiag {
+          0%   { transform: translate3d(0, 0, 0) scale(1); }
+          50%  { transform: translate3d(110px, -110px, 0) scale(1.2); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           [class*="animate-["] { animation: none !important; }
         }
