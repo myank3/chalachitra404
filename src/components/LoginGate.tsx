@@ -7,7 +7,6 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   const [showKey, setShowKey] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -19,14 +18,6 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (state === 'out') inputRef.current?.focus();
   }, [state]);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setReducedMotion(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -68,116 +59,69 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen bg-[#08080a] text-[#f5f5f7] flex items-center justify-center p-4 overflow-hidden">
       {/* ═══════════════════════════════════════════
-          SVG FILTER — the Rorschach inkblot engine
-          ═══════════════════════════════════════════ */}
-      <svg aria-hidden className="pointer-events-none absolute w-0 h-0" focusable="false">
-        <defs>
-          <filter id="inkblot" x="-20%" y="-20%" width="140%" height="140%">
-            <feTurbulence
-              type="fractalNoise"
-              baseFrequency="0.007"
-              numOctaves="2"
-              seed="3"
-              result="noise"
-            >
-              {!reducedMotion && (
-                <animate
-                  attributeName="baseFrequency"
-                  dur="32s"
-                  values="0.007;0.012;0.007"
-                  repeatCount="indefinite"
-                  calcMode="spline"
-                  keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
-                />
-              )}
-            </feTurbulence>
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="noise"
-              scale="180"
-              xChannelSelector="R"
-              yChannelSelector="G"
-            >
-              {!reducedMotion && (
-                <animate
-                  attributeName="scale"
-                  dur="22s"
-                  values="150;220;150"
-                  repeatCount="indefinite"
-                  calcMode="spline"
-                  keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
-                />
-              )}
-            </feDisplacementMap>
-          </filter>
-        </defs>
-      </svg>
-
-      {/* ═══════════════════════════════════════════
-          BACKDROP — the color layer is filtered
+          MOVING BLUR BACKDROP
+          - No `filter: blur()` on orbs (expensive per-frame)
+          - Soft radial-gradients do the blur for free
+          - Only `transform` animates → GPU compositor
+          - 5 orbs, each drifting a different direction
           ═══════════════════════════════════════════ */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[#08080a]" />
 
-        <div className="absolute inset-0 will-change-[filter]" style={{ filter: 'url(#inkblot)' }}>
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0b0a14] via-[#08080a] to-[#050507]" />
+        {/* Orb 1 — violet, drifts UP-LEFT */}
+        <div
+          className="absolute top-[-15%] left-[-10%] w-[720px] h-[720px] rounded-full
+                     animate-[driftUpLeft_22s_ease-in-out_infinite]
+                     will-change-transform"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(124,92,255,0.85) 0%, rgba(124,92,255,0.35) 30%, rgba(124,92,255,0.08) 55%, rgba(124,92,255,0) 75%)',
+          }}
+        />
 
-          {/* Orb 1 — violet */}
-          <div
-            className="absolute w-[700px] h-[700px] rounded-full"
-            style={{
-              top: '-15%',
-              left: '-12%',
-              background:
-                'radial-gradient(circle, rgba(124,92,255,0.9) 0%, rgba(124,92,255,0.4) 35%, rgba(124,92,255,0) 70%)',
-              filter: 'blur(40px)',
-            }}
-          />
-          {/* Orb 2 — pink */}
-          <div
-            className="absolute w-[700px] h-[700px] rounded-full"
-            style={{
-              bottom: '-18%',
-              right: '-14%',
-              background:
-                'radial-gradient(circle, rgba(255,107,157,0.85) 0%, rgba(255,107,157,0.35) 35%, rgba(255,107,157,0) 70%)',
-              filter: 'blur(40px)',
-            }}
-          />
-          {/* Orb 3 — teal */}
-          <div
-            className="absolute w-[550px] h-[550px] rounded-full"
-            style={{
-              top: '30%',
-              left: '55%',
-              background:
-                'radial-gradient(circle, rgba(94,234,212,0.7) 0%, rgba(94,234,212,0.25) 35%, rgba(94,234,212,0) 70%)',
-              filter: 'blur(50px)',
-            }}
-          />
-          {/* Orb 4 — deep purple */}
-          <div
-            className="absolute w-[600px] h-[600px] rounded-full"
-            style={{
-              bottom: '5%',
-              left: '5%',
-              background:
-                'radial-gradient(circle, rgba(90,50,200,0.85) 0%, rgba(90,50,200,0.3) 35%, rgba(90,50,200,0) 70%)',
-              filter: 'blur(45px)',
-            }}
-          />
-          {/* Orb 5 — magenta */}
-          <div
-            className="absolute w-[500px] h-[500px] rounded-full"
-            style={{
-              top: '12%',
-              right: '8%',
-              background:
-                'radial-gradient(circle, rgba(214,58,140,0.8) 0%, rgba(214,58,140,0.3) 35%, rgba(214,58,140,0) 70%)',
-              filter: 'blur(50px)',
-            }}
-          />
-        </div>
+        {/* Orb 2 — pink, drifts DOWN-RIGHT */}
+        <div
+          className="absolute bottom-[-18%] right-[-12%] w-[720px] h-[720px] rounded-full
+                     animate-[driftDownRight_26s_ease-in-out_infinite]
+                     will-change-transform"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(255,107,157,0.8) 0%, rgba(255,107,157,0.3) 30%, rgba(255,107,157,0.07) 55%, rgba(255,107,157,0) 75%)',
+          }}
+        />
+
+        {/* Orb 3 — teal, drifts RIGHT */}
+        <div
+          className="absolute top-[30%] left-[45%] w-[560px] h-[560px] rounded-full
+                     animate-[driftRight_30s_ease-in-out_infinite]
+                     will-change-transform"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(94,234,212,0.65) 0%, rgba(94,234,212,0.22) 30%, rgba(94,234,212,0.05) 55%, rgba(94,234,212,0) 75%)',
+          }}
+        />
+
+        {/* Orb 4 — deep violet, drifts LEFT */}
+        <div
+          className="absolute bottom-[5%] left-[10%] w-[620px] h-[620px] rounded-full
+                     animate-[driftLeft_24s_ease-in-out_infinite]
+                     will-change-transform"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(90,50,200,0.8) 0%, rgba(90,50,200,0.28) 30%, rgba(90,50,200,0.06) 55%, rgba(90,50,200,0) 75%)',
+          }}
+        />
+
+        {/* Orb 5 — magenta, drifts DOWN */}
+        <div
+          className="absolute top-[10%] right-[6%] w-[520px] h-[520px] rounded-full
+                     animate-[driftDown_28s_ease-in-out_infinite]
+                     will-change-transform"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(214,58,140,0.75) 0%, rgba(214,58,140,0.25) 30%, rgba(214,58,140,0.06) 55%, rgba(214,58,140,0) 75%)',
+          }}
+        />
 
         {/* Vignette */}
         <div
@@ -199,7 +143,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* ═══════════════════════════════════════════
-          CARD
+          CARD — blurred glass, moving colors show through
           ═══════════════════════════════════════════ */}
       <div className="relative w-full max-w-sm animate-[gateIn_800ms_cubic-bezier(0.16,1,0.3,1)_both]">
         {/* Monogram */}
@@ -246,16 +190,15 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           <span className="h-px w-12 bg-gradient-to-l from-transparent to-white/30" />
         </div>
 
-        {/* Sub-tagline */}
         <p className="text-center text-[9.5px] uppercase tracking-[0.35em] text-white/40 mb-10">
           Private Access
         </p>
 
-        {/* Form */}
+        {/* Glass form card */}
         <form
           onSubmit={submit}
           className="relative overflow-hidden rounded-2xl
-                     bg-black/30
+                     bg-white/[0.02]
                      backdrop-blur-[40px] backdrop-saturate-150
                      border border-white/[0.09]
                      p-7
@@ -340,7 +283,6 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           </button>
         </form>
 
-        {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-[8.5px] uppercase tracking-[0.3em] text-white/25">
             By Invitation Only
@@ -362,6 +304,37 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           0%, 100% { transform: translateX(0); }
           25%      { transform: translateX(-4px); }
           75%      { transform: translateX(4px); }
+        }
+
+        /* ── TRANSFORM-ONLY DRIFT (144Hz safe) ── */
+        @keyframes driftUpLeft {
+          0%   { transform: translate3d(0, 0, 0) scale(1); }
+          50%  { transform: translate3d(-90px, -120px, 0) scale(1.15); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
+        }
+        @keyframes driftDownRight {
+          0%   { transform: translate3d(0, 0, 0) scale(1); }
+          50%  { transform: translate3d(110px, 130px, 0) scale(1.12); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
+        }
+        @keyframes driftRight {
+          0%   { transform: translate3d(0, 0, 0) scale(1); }
+          50%  { transform: translate3d(160px, 0, 0) scale(1.2); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
+        }
+        @keyframes driftLeft {
+          0%   { transform: translate3d(0, 0, 0) scale(1); }
+          50%  { transform: translate3d(-150px, 0, 0) scale(1.18); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
+        }
+        @keyframes driftDown {
+          0%   { transform: translate3d(0, 0, 0) scale(1); }
+          50%  { transform: translate3d(0, 140px, 0) scale(1.14); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          [class*="animate-["] { animation: none !important; }
         }
       `}</style>
     </div>
