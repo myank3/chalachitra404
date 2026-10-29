@@ -58,10 +58,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative min-h-screen bg-[#08080a] text-[#f5f5f7] flex items-center justify-center p-6 overflow-hidden">
-      {/* ═══════════════════════════════════════════
-          BACKDROP — 7 orbs, purple / pink / gold only
-          No teal. Every orb drifts a different way.
-          ═══════════════════════════════════════════ */}
+      {/* ═══ BACKDROP — 7 orbs, faster drifts ═══ */}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 overflow-hidden"
@@ -69,10 +66,10 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
       >
         <div className="absolute inset-0 bg-[#08080a]" />
 
-        {/* 1 — violet, up-left */}
+        {/* 1 — violet, up-left — 10s */}
         <div
           className="absolute -top-[12%] -left-[8%] w-[540px] h-[540px] rounded-full
-                     animate-[driftUpLeft_22s_ease-in-out_infinite]"
+                     animate-[driftUpLeft_10s_ease-in-out_infinite]"
           style={{
             background:
               'radial-gradient(circle, rgba(124,92,255,0.9) 0%, rgba(124,92,255,0.35) 32%, rgba(124,92,255,0) 70%)',
@@ -80,10 +77,10 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           }}
         />
 
-        {/* 2 — pink, down-right */}
+        {/* 2 — pink, down-right — 12s */}
         <div
           className="absolute -bottom-[14%] -right-[10%] w-[540px] h-[540px] rounded-full
-                     animate-[driftDownRight_26s_ease-in-out_infinite]"
+                     animate-[driftDownRight_12s_ease-in-out_infinite]"
           style={{
             background:
               'radial-gradient(circle, rgba(255,107,157,0.85) 0%, rgba(255,107,157,0.3) 32%, rgba(255,107,157,0) 70%)',
@@ -91,10 +88,10 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           }}
         />
 
-        {/* 3 — light purple, drifts right (replaces teal) */}
+        {/* 3 — light purple, right — 9s */}
         <div
           className="absolute top-[28%] left-[44%] w-[460px] h-[460px] rounded-full
-                     animate-[driftRight_30s_ease-in-out_infinite]"
+                     animate-[driftRight_9s_ease-in-out_infinite]"
           style={{
             background:
               'radial-gradient(circle, rgba(184,164,255,0.7) 0%, rgba(184,164,255,0.25) 32%, rgba(184,164,255,0) 70%)',
@@ -102,10 +99,10 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           }}
         />
 
-        {/* 4 — deep violet, drifts left */}
+        {/* 4 — deep violet, left — 11s */}
         <div
           className="absolute bottom-[4%] left-[4%] w-[520px] h-[520px] rounded-full
-                     animate-[driftLeft_24s_ease-in-out_infinite]"
+                     animate-[driftLeft_11s_ease-in-out_infinite]"
           style={{
             background:
               'radial-gradient(circle, rgba(90,50,200,0.85) 0%, rgba(90,50,200,0.3) 32%, rgba(90,50,200,0) 70%)',
@@ -113,10 +110,10 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           }}
         />
 
-        {/* 5 — champagne gold, drifts down */}
+        {/* 5 — champagne gold, down — 13s */}
         <div
           className="absolute top-[2%] right-[6%] w-[500px] h-[500px] rounded-full
-                     animate-[driftDown_28s_ease-in-out_infinite]"
+                     animate-[driftDown_13s_ease-in-out_infinite]"
           style={{
             background:
               'radial-gradient(circle, rgba(212,185,110,0.55) 0%, rgba(212,185,110,0.2) 32%, rgba(212,185,110,0) 70%)',
@@ -124,10 +121,10 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           }}
         />
 
-        {/* 6 — magenta, drifts up */}
+        {/* 6 — magenta, up — 7s */}
         <div
           className="absolute bottom-[12%] right-[16%] w-[440px] h-[440px] rounded-full
-                     animate-[driftUp_20s_ease-in-out_infinite]"
+                     animate-[driftUp_7s_ease-in-out_infinite]"
           style={{
             background:
               'radial-gradient(circle, rgba(200,77,208,0.65) 0%, rgba(200,77,208,0.22) 32%, rgba(200,77,208,0) 70%)',
@@ -135,10 +132,10 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           }}
         />
 
-        {/* 7 — soft pink, diagonal drift */}
+        {/* 7 — soft pink, diagonal — 14s */}
         <div
           className="absolute top-[38%] left-[6%] w-[380px] h-[380px] rounded-full
-                     animate-[driftDiag_32s_ease-in-out_infinite]"
+                     animate-[driftDiag_14s_ease-in-out_infinite]"
           style={{
             background:
               'radial-gradient(circle, rgba(255,141,179,0.55) 0%, rgba(255,141,179,0.18) 32%, rgba(255,141,179,0) 70%)',
@@ -156,9 +153,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
         />
       </div>
 
-      {/* ═══════════════════════════════════════════
-          CARD
-          ═══════════════════════════════════════════ */}
+      {/* ═══ CARD ═══ */}
       <div className="relative w-full max-w-[400px] animate-[gateIn_600ms_cubic-bezier(0.16,1,0.3,1)_both]">
         {/* Ornament */}
         <div className="flex items-center justify-center gap-4 mb-10">
@@ -283,19 +278,11 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           </button>
         </form>
 
-        {/* Footer */}
-        <div className="mt-16">
-          <div className="flex items-center justify-center gap-3 mb-5">
-            <span className="h-px w-8 bg-white/15" />
-            <span className="h-px w-2 bg-[#d4b96e]/40" />
-            <span className="h-px w-8 bg-white/15" />
-          </div>
-          <p
-            className="text-center text-[8.5px] uppercase tracking-[0.4em] text-white/25"
-            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-          >
-            Since MMXXVI · By Invitation
-          </p>
+        {/* Footer — line only, no "Since" text */}
+        <div className="mt-12 flex items-center justify-center gap-3">
+          <span className="h-px w-8 bg-white/15" />
+          <span className="h-px w-2 bg-[#d4b96e]/40" />
+          <span className="h-px w-8 bg-white/15" />
         </div>
       </div>
 
@@ -305,7 +292,6 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           to   { opacity: 1; transform: translate3d(0, 0, 0)    scale(1); }
         }
 
-        /* Transform-only drifts — 144Hz safe, no freeze */
         @keyframes driftUpLeft {
           0%   { transform: translate3d(0, 0, 0) scale(1); }
           50%  { transform: translate3d(-90px, -120px, 0) scale(1.15); }
