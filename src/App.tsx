@@ -10,7 +10,7 @@ import { Toaster } from 'sonner';
 import { useUIStore, NavTab } from './stores/useUIStore';
 import { useWatchlist } from './stores/watchlist';
 import { useDetails } from './lib/api';
-
+import { isInApp } from './lib/isInApp';
 
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -84,8 +84,6 @@ function HistoryRecorder() {
   useEffect(() => {
     if (!type || !id) return;
 
-    console.log('[HistoryRecorder] recording', type, id, item?.title);
-
     recordHistory({
       id: item?.id ?? Number(id),
       type,
@@ -157,10 +155,65 @@ function AppLayout() {
 }
 
 export default function App() {
+  // ── App-only protection: add `in-app` class to <html> ──
+  // The CSS in index.css keys off this class. Website never gets it.
+  useEffect(() => {
+    if (isInApp()) {
+      document.documentElement.classList.add('in-app');
+    }
+  }, []);
+
+  // ── App-only protection: block copy / cut / right-click / drag ──
+  // Web version is untouched because isInApp() returns false there.
+  useEffect(() => {
+    if (!isInApp()) return;
+
+    const block = (e: Event) => e.preventDefault();
+
+    const blockKeys = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const inField =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable;
+
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+
+      const k = e.key.toLowerCase();
+      if (!['c', 'x', 'a', 's', 'p'].includes(k)) return;
+
+      // Inside inputs: allow copy/cut/paste, block select-all + print
+      if (inField) {
+        if (k === 'a' || k === 'p') e.preventDefault();
+        return;
+      }
+
+      // Everywhere else: block the whole set
+      e.preventDefault();
+    };
+
+    document.addEventListener('contextmenu', block);
+    document.addEventListener('copy', block);
+    document.addEventListener('cut', block);
+    document.addEventListener('dragstart', block);
+    document.addEventListener('selectstart', block);
+    document.addEventListener('keydown', blockKeys);
+
+    return () => {
+      document.removeEventListener('contextmenu', block);
+      document.removeEventListener('copy', block);
+      document.removeEventListener('cut', block);
+      document.removeEventListener('dragstart', block);
+      document.removeEventListener('selectstart', block);
+      document.removeEventListener('keydown', blockKeys);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-       <ScrollToTop />  
+        <ScrollToTop />
         <RouteSync />
         <HistoryRecorder />
         <AppLayout />
