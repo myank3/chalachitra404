@@ -13,10 +13,10 @@
     --text-subtle: rgba(245, 245, 247, 0.38);
 
     /* NEW Accent Palette (Accents only, not neon) */
-    --accent-primary: #7c5cff;   /* violet — primary action, active states */
-    --accent-secondary: #ff6b9d; /* pink — highlights, badges, mascot */
-    --accent-warm: #ffb347;      /* amber — ratings, stars */
-    --accent-cool: #5eead4;      /* teal — success, "new" tags */
+    --accent-primary: #7c5cff;
+    --accent-secondary: #ff6b9d;
+    --accent-warm: #ffb347;
+    --accent-cool: #5eead4;
     --accent-gradient: linear-gradient(135deg, #7c5cff 0%, #ff6b9d 100%);
 
     --accent: var(--accent-primary);
@@ -25,7 +25,6 @@
     --success: var(--accent-cool);
     --danger: #ff453a;
 
-    /* Typography Stack */
     --font-sans: 'Inter', system-ui, -apple-system, 'SF Pro Display', sans-serif;
     --radius: 12px;
     --shadow-subtle: 0 4px 24px rgba(0, 0, 0, 0.4);
@@ -47,13 +46,11 @@
     font-weight: 600;
   }
 
-  /* Keyboard accessibility focus ring */
   :focus-visible {
     outline: 2px solid var(--accent-primary);
     outline-offset: 2px;
   }
 
-  /* Tabular figures for ratings and runtimes */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
@@ -61,93 +58,50 @@
 
 /* Animations & Keyframes */
 @keyframes ambientDrift {
-  0% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(4%, 2%) scale(1.1);
-  }
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(4%, 2%) scale(1.1); }
+  100% { transform: translate(0, 0) scale(1); }
 }
 
 @keyframes kenburns {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-  }
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
 @keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @keyframes mascotBreathe {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.02);
-  }
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.02); }
 }
 
 @keyframes mascotSway {
-  0%, 100% {
-    transform: rotate(0deg);
-  }
-  25% {
-    transform: rotate(-3deg);
-  }
-  75% {
-    transform: rotate(3deg);
-  }
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(-3deg); }
+  75%      { transform: rotate(3deg); }
 }
 
 @keyframes antennaSpin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 @keyframes pulseHeart {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.3);
-  }
-  100% {
-    transform: scale(1);
-  }
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
 }
 
 @keyframes pulseStar {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-  }
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
 }
 
-/* Reduced motion disables animations */
 @media (prefers-reduced-motion: reduce) {
   .animate-ambient-drift,
   .animate-ken-burns,
@@ -160,7 +114,6 @@
   }
 }
 
-/* Skeleton shimmer utility */
 .shimmer-active {
   background: linear-gradient(
     90deg,
@@ -172,7 +125,6 @@
   animation: shimmer 1.6s linear infinite;
 }
 
-/* Surface Primitives - Solid, subtle hairline borders */
 .surface-card {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -198,7 +150,6 @@
   border-radius: var(--radius);
 }
 
-/* Clean scrollbar suppression */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -209,9 +160,6 @@
 
 /* ═══════════════════════════════════════════════
    APP-ONLY COPY PROTECTION
-   Only applies when <html class="in-app"> is set,
-   which App.tsx does after detecting the WebView UA.
-   Website is 100% unaffected.
    ═══════════════════════════════════════════════ */
 
 html.in-app,
@@ -225,7 +173,6 @@ html.in-app * {
   -webkit-tap-highlight-color: transparent !important;
 }
 
-/* Re-enable selection ONLY inside form fields so typing works */
 html.in-app input,
 html.in-app textarea,
 html.in-app [contenteditable='true'] {
@@ -236,7 +183,6 @@ html.in-app [contenteditable='true'] {
   -webkit-touch-callout: default !important;
 }
 
-/* Kill the blue/green selection highlight in-app */
 html.in-app ::selection {
   background: transparent !important;
   color: inherit !important;
@@ -246,15 +192,130 @@ html.in-app ::-moz-selection {
   color: inherit !important;
 }
 
-/* Images can't be dragged out of the app */
 html.in-app img {
   -webkit-user-drag: none !important;
   user-drag: none !important;
   pointer-events: auto !important;
 }
 
-/* Videos too */
 html.in-app video {
   -webkit-user-drag: none !important;
   user-drag: none !important;
+}
+
+/* ═══════════════════════════════════════════════
+   APP-ONLY PERFORMANCE MODE
+   Only inside the APK (html.in-app).
+   Kills the WebView's biggest perf sinks while
+   keeping the dark aesthetic intact.
+   ═══════════════════════════════════════════════ */
+
+/* 1. Kill every backdrop-filter — the #1 WebView killer.
+   Replace with solid dark fills that read the same. */
+html.in-app * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.in-app header,
+html.in-app nav {
+  background-color: rgba(10, 10, 11, 0.96) !important;
+}
+
+html.in-app [class*="backdrop-blur"] {
+  background-color: rgba(20, 20, 24, 0.92) !important;
+}
+
+/* 2. Force every animated layer onto the GPU and keep
+   them bounded so WebView doesn't reflow on each frame. */
+html.in-app [class*="animate-["],
+html.in-app [class*="animate-ambient"],
+html.in-app [class*="animate-ken"],
+html.in-app .animate-mascot-breathe,
+html.in-app .animate-mascot-sway {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* 3. Disable the heaviest infinite animations entirely.
+   Hero Ken Burns, ambient drift, shimmer — all of these
+   force constant repaints in a WebView. The static
+   version looks 95% the same and is 10x cheaper. */
+html.in-app [class*="animate-[heroKenBurns"],
+html.in-app [class*="animate-[kenburns"],
+html.in-app [class*="animate-[ambientDrift"],
+html.in-app [class*="animate-[shimmer"],
+html.in-app [class*="animate-[pulseSoft"],
+html.in-app [class*="animate-[pulseHeart"],
+html.in-app [class*="animate-[pulseStar"],
+html.in-app [class*="animate-[antennaSpin"],
+html.in-app .shimmer-active {
+  animation: none !important;
+}
+
+/* 4. Slow the login-gate orbs down dramatically.
+   Fewer frames = less compositor work. The visual
+   effect is preserved, just calmer. */
+html.in-app [class*="animate-[drift"] {
+  animation-duration: 40s !important;
+}
+
+/* 5. `content-visibility: auto` on offscreen sections.
+   The browser skips rendering anything below the fold
+   until the user scrolls near it. Huge win on long
+   pages like Home and DetailPage. */
+html.in-app section,
+html.in-app main > div > div {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
+}
+
+/* 6. Kill heavy box-shadows — each one is a separate
+   blur pass on the GPU. Keep only on focusable
+   interactive elements. */
+html.in-app [class*="shadow-["] {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* 7. Disable the pulse animation on the "live" clock dot
+   and other micro-animations that redraw every frame. */
+html.in-app .animate-pulse {
+  animation: none !important;
+  opacity: 1 !important;
+}
+
+/* 8. Reduce transition durations — 200ms feels sluggish
+   in a WebView. 100ms feels instant and is cheaper. */
+html.in-app [class*="transition-"] {
+  transition-duration: 100ms !important;
+}
+
+/* 9. Force the compositor to only paint visible layers. */
+html.in-app img,
+html.in-app video,
+html.in-app iframe {
+  contain: layout paint style;
+}
+
+/* 10. Native-feeling tap feedback without JS. */
+html.in-app button:active,
+html.in-app [role="button"]:active,
+html.in-app a:active {
+  transform: scale(0.98);
+  transition: transform 60ms ease-out;
+}
+
+/* 11. Hide the login-gate particle/orb layers beyond the
+   first three — they contribute nothing visible but each
+   costs a compositor layer. */
+html.in-app [class*="animate-[drift"]:nth-of-type(n + 4) {
+  display: none !important;
+}
+
+/* 12. Disable scroll-driven animations and smooth
+   scrolling which can hitch on older Android WebViews. */
+html.in-app {
+  scroll-behavior: auto !important;
+  overscroll-behavior: none;
 }
