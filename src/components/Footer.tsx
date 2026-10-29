@@ -303,7 +303,7 @@ export const Footer: React.FC = () => {
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[rgba(245,245,247,0.38)]">
             <div className="flex items-center gap-2 tracking-wide">
               <BullLogo size={26} />
-              <span>Made by M🔺Y🔺N K</span>
+              <span>MYK</span>
             </div>
             <div className="flex items-center gap-4 text-xs">
               {[
