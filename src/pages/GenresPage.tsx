@@ -114,7 +114,7 @@ export const GenresPage: React.FC = () => {
             <button
               type="button"
               onClick={() => handleTypeChange('movie')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer touch-manipulation ${
                 mediaType === 'movie'
                   ? 'bg-white text-black font-semibold'
                   : 'text-[rgba(245,245,247,0.62)] hover:text-white'
@@ -125,7 +125,7 @@ export const GenresPage: React.FC = () => {
             <button
               type="button"
               onClick={() => handleTypeChange('tv')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer touch-manipulation ${
                 mediaType === 'tv'
                   ? 'bg-white text-black font-semibold'
                   : 'text-[rgba(245,245,247,0.62)] hover:text-white'
@@ -153,7 +153,7 @@ export const GenresPage: React.FC = () => {
                   key={genre.id}
                   type="button"
                   onClick={() => handleGenreChange(genre.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors cursor-pointer ${
+                  className={`px-4 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors cursor-pointer touch-manipulation ${
                     isSelected
                       ? 'bg-white text-black font-semibold shadow-sm'
                       : 'bg-white/[0.04] text-[rgba(245,245,247,0.7)] hover:bg-white/[0.08] hover:text-white border border-white/[0.08]'
@@ -178,14 +178,14 @@ export const GenresPage: React.FC = () => {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 sm:gap-3 md:gap-4">
             {Array.from({ length: 12 }).map((_, i) => (
               <MovieCardSkeleton key={i} />
             ))}
           </div>
         ) : items.length > 0 ? (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 sm:gap-3 md:gap-4">
               {items.map((item, i) => (
                 <MovieCard
                   key={`${item.media_type}-${item.id}`}
@@ -202,7 +202,7 @@ export const GenresPage: React.FC = () => {
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="px-4 py-2 rounded-xl bg-white/[0.05] border border-white/[0.1] text-xs font-medium text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.1] cursor-pointer transition-colors"
+                  className="px-4 py-2 rounded-xl bg-white/[0.05] border border-white/[0.1] text-xs font-medium text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.1] cursor-pointer transition-colors touch-manipulation"
                 >
                   Previous
                 </button>
@@ -215,7 +215,7 @@ export const GenresPage: React.FC = () => {
                   onClick={() =>
                     setPage((p) => Math.min(totalPages, 500, p + 1))
                   }
-                  className="px-4 py-2 rounded-xl bg-white/[0.05] border border-white/[0.1] text-xs font-medium text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.1] cursor-pointer transition-colors"
+                  className="px-4 py-2 rounded-xl bg-white/[0.05] border border-white/[0.1] text-xs font-medium text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.1] cursor-pointer transition-colors touch-manipulation"
                 >
                   Next
                 </button>

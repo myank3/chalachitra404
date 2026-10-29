@@ -24,11 +24,9 @@ import { recordWatched } from '../lib/recommend';
 import { Mascot } from '../components/Mascot';
 import { ServerDropdown } from '../components/ServerDropdown';
 
-/* Shared size ladder */
 const WIDTH_LADDER =
   'w-full max-w-full sm:max-w-[624px] md:max-w-[844px] lg:max-w-[1044px] xl:max-w-[1184px] mx-auto';
 
-/* Memoized iframe */
 const PlayerFrame = memo(function PlayerFrame({
   url,
   title,
@@ -48,9 +46,6 @@ const PlayerFrame = memo(function PlayerFrame({
   );
 });
 
-/* ────────────────────────────────────────────────
-   Related fetch for MOVIES
-   ──────────────────────────────────────────────── */
 async function fetchRelatedMovie(
   movieId: string,
   collectionId?: number
@@ -70,13 +65,9 @@ async function fetchRelatedMovie(
               new Date(a.release_date || 0).getTime() -
               new Date(b.release_date || 0).getTime()
           );
-        if (parts.length > 0) {
-          return { items: parts, source: 'collection' };
-        }
+        if (parts.length > 0) return { items: parts, source: 'collection' };
       }
-    } catch {
-      /* fall through to similar */
-    }
+    } catch {}
   }
 
   try {
@@ -84,7 +75,6 @@ async function fetchRelatedMovie(
       fetch(u(`/movie/${movieId}/recommendations`, '&page=1')),
       fetch(u(`/movie/${movieId}/similar`, '&page=1')),
     ]);
-
     const a: any[] =
       recRes.status === 'fulfilled' && recRes.value.ok
         ? (await recRes.value.json()).results ?? []
@@ -93,7 +83,6 @@ async function fetchRelatedMovie(
       simRes.status === 'fulfilled' && simRes.value.ok
         ? (await simRes.value.json()).results ?? []
         : [];
-
     const seen = new Set<number>();
     const merged: any[] = [];
     for (const item of [...a, ...b]) {
@@ -101,16 +90,12 @@ async function fetchRelatedMovie(
       seen.add(item.id);
       merged.push(item);
     }
-
     return { items: merged, source: merged.length ? 'similar' : 'none' };
   } catch {
     return { items: [], source: 'none' };
   }
 }
 
-/* ────────────────────────────────────────────────
-   Inline RelatedRow for movies
-   ──────────────────────────────────────────────── */
 const RelatedRow: React.FC<{
   title: string;
   subtitle?: string;
@@ -122,13 +107,16 @@ const RelatedRow: React.FC<{
     const el = scrollerRef.current;
     if (!el) return;
     const amount = el.clientWidth * 0.8;
-    el.scrollBy({ left: dir === 'left' ? -amount : amount, behavior: 'smooth' });
+    el.scrollBy({ left: dir === 'left' ? -amount : amount, behavior: 'auto' });
   };
 
   if (!items || items.length === 0) return null;
 
   return (
-    <section className="relative">
+    <section
+      className="relative"
+      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
+    >
       <div className="flex items-end justify-between mb-5 px-1">
         <div>
           {subtitle && (
@@ -146,27 +134,24 @@ const RelatedRow: React.FC<{
         <button
           onClick={() => scroll('left')}
           aria-label="Scroll left"
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer touch-manipulation"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black transition-opacity duration-150 cursor-pointer touch-manipulation"
         >
           <ChevronRight className="w-5 h-5 rotate-180" strokeWidth={2} />
         </button>
         <button
           onClick={() => scroll('right')}
           aria-label="Scroll right"
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer touch-manipulation"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black transition-opacity duration-150 cursor-pointer touch-manipulation"
         >
           <ChevronRight className="w-5 h-5" strokeWidth={2} />
         </button>
 
         <div
           ref={scrollerRef}
-          className="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-1"
+          className="flex gap-4 overflow-x-auto no-scrollbar pb-1"
         >
           {items.map((item, i) => (
-            <div
-              key={`${item.id}-${i}`}
-              className="w-[160px] sm:w-[180px] shrink-0"
-            >
+            <div key={`${item.id}-${i}`} className="w-[160px] sm:w-[180px] shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -174,7 +159,7 @@ const RelatedRow: React.FC<{
                 }}
                 className="group/card block w-full text-left cursor-pointer touch-manipulation"
               >
-                <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/[0.08] transition-[border-color,filter] duration-200 group-hover/card:brightness-125 group-active/card:brightness-125 group-hover/card:border-[rgba(124,92,255,0.45)]">
+                <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/[0.08] transition-colors duration-150 group-hover/card:border-[rgba(124,92,255,0.45)]">
                   {item.poster_path ? (
                     <img
                       src={`https://image.tmdb.org/t/p/w342${item.poster_path}`}
@@ -300,7 +285,7 @@ export const WatchMovie: React.FC = () => {
     const targetY = startY + el.getBoundingClientRect().top - 8;
     const distance = targetY - startY;
     if (Math.abs(distance) < 2) return;
-    const duration = 900;
+    const duration = 700;
     let startTime: number | null = null;
     const easeInOutQuint = (t: number) =>
       t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
@@ -426,20 +411,23 @@ export const WatchMovie: React.FC = () => {
       </div>
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        {/* 1. Back */}
-        <div className="mb-4 animate-[fadeSlideDown_400ms_ease-out_both]">
+        {/* Back */}
+        <div className="mb-4">
           <button
             type="button"
             onClick={() => navigate(-1)}
             className="group inline-flex items-center gap-2 py-2 pr-3 text-sm text-[rgba(245,245,247,0.62)] hover:text-white active:text-white transition-colors cursor-pointer touch-manipulation"
           >
-            <ArrowLeft className="w-4 h-4 stroke-[1.5] transition-transform group-hover:-translate-x-0.5" />
+            <ArrowLeft className="w-4 h-4 stroke-[1.5] transition-transform duration-150 group-hover:-translate-x-0.5" />
             <span>Back</span>
           </button>
         </div>
 
-        {/* 2. Player — full-bleed on mobile, boxed on sm+ */}
-        <div className="-mx-4 sm:mx-auto sm:max-w-[624px] md:max-w-[844px] lg:max-w-[1044px] xl:max-w-[1184px] animate-[playerIn_600ms_cubic-bezier(0.16,1,0.3,1)_both]">
+        {/* Player — full-bleed mobile, boxed sm+ */}
+        <div
+          className="-mx-4 sm:mx-auto sm:max-w-[624px] md:max-w-[844px] lg:max-w-[1044px] xl:max-w-[1184px]"
+          style={{ animation: 'simpleFadeIn 350ms ease-out both' }}
+        >
           <div
             className="
               group relative w-full aspect-video
@@ -448,15 +436,15 @@ export const WatchMovie: React.FC = () => {
               sm:rounded-2xl overflow-hidden
               shadow-[0_8px_40px_-8px_rgba(0,0,0,0.9)]
             "
+            style={{ contain: 'layout paint' }}
           >
+            {/* Static gradient line — was an animated shimmer */}
             <div
               aria-hidden
               className="absolute top-0 left-0 right-0 h-px z-20 pointer-events-none"
               style={{
                 background:
                   'linear-gradient(90deg, transparent, rgba(124,92,255,0.7), rgba(255,107,157,0.6), rgba(124,92,255,0.7), transparent)',
-                backgroundSize: '200% 100%',
-                animation: 'shimmer 6s linear infinite',
               }}
             />
 
@@ -479,7 +467,7 @@ export const WatchMovie: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. Source + Scroll to details */}
+        {/* Source + Scroll to details */}
         <div className={`${WIDTH_LADDER} mt-5 flex flex-wrap items-center justify-between gap-3`}>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)] shrink-0">
@@ -494,13 +482,17 @@ export const WatchMovie: React.FC = () => {
             className="group inline-flex items-center gap-1.5 py-1.5 -my-1.5 text-xs text-[rgba(245,245,247,0.55)] hover:text-white active:text-white transition-colors cursor-pointer touch-manipulation"
           >
             <span>Scroll for details</span>
-            <ChevronDown className="w-3.5 h-3.5 transition-transform group-hover:translate-y-0.5" />
+            <ChevronDown className="w-3.5 h-3.5 transition-transform duration-150 group-hover:translate-y-0.5" />
           </button>
         </div>
 
-        {/* 4. Info */}
+        {/* Info */}
         {movie && (
-          <div ref={detailsRef} className={`${WIDTH_LADDER} mt-8 scroll-mt-4`}>
+          <div
+            ref={detailsRef}
+            className={`${WIDTH_LADDER} mt-8 scroll-mt-4`}
+            style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 400px' }}
+          >
             <div className="max-w-[820px] space-y-4">
               <h1 className="text-[28px] sm:text-[34px] font-semibold tracking-[-0.02em] text-[#f5f5f7] leading-tight">
                 {movie.title}
@@ -537,7 +529,7 @@ export const WatchMovie: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.08] border border-white/[0.08] text-xs text-[rgba(245,245,247,0.75)] hover:text-white active:text-white transition-all duration-200 cursor-pointer touch-manipulation"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.08] border border-white/[0.08] text-xs text-[rgba(245,245,247,0.75)] hover:text-white active:text-white transition-colors duration-150 cursor-pointer touch-manipulation"
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[1.5]" /> : <Share2 className="w-3.5 h-3.5 stroke-[1.5]" />}
                   <span>{copied ? 'Copied' : 'Share'}</span>
@@ -546,7 +538,7 @@ export const WatchMovie: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleToggleWatchlist}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs transition-all duration-200 cursor-pointer touch-manipulation ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs transition-colors duration-150 cursor-pointer touch-manipulation ${
                     inWatchlist
                       ? 'bg-white text-black border-white font-medium hover:bg-[#e8e8ea] active:bg-[#e8e8ea]'
                       : 'bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.08] border-white/[0.08] text-[rgba(245,245,247,0.75)] hover:text-white active:text-white'
@@ -559,7 +551,7 @@ export const WatchMovie: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleMarkWatched}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs transition-all duration-200 cursor-pointer touch-manipulation ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs transition-colors duration-150 cursor-pointer touch-manipulation ${
                     markedWatched
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-medium'
                       : 'bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.08] border-white/[0.08] text-[rgba(245,245,247,0.75)] hover:text-white active:text-white'
@@ -573,7 +565,7 @@ export const WatchMovie: React.FC = () => {
           </div>
         )}
 
-        {/* 5. Related */}
+        {/* Related */}
         {movie && relatedItems.length > 0 && (
           <div className="mt-14">
             <RelatedRow
@@ -586,28 +578,19 @@ export const WatchMovie: React.FC = () => {
       </div>
 
       <style>{`
-        @keyframes fadeSlideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeSlideUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes playerIn {
-          from { opacity: 0; transform: scale(0.985) translateY(10px); filter: blur(6px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
-        }
-        @keyframes shimmer {
-          from { background-position: 0% 50%; }
-          to   { background-position: 200% 50%; }
+        @keyframes simpleFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
         @keyframes pulseSoft {
           0%, 100% { opacity: 0.55; }
           50%      { opacity: 1; }
         }
         @media (prefers-reduced-motion: reduce) {
-          [class*="animate-["] { animation: none !important; }
+          [style*="simpleFadeIn"],
+          .animate-\\[pulseSoft_1\\.6s_ease-in-out_infinite\\] {
+            animation: none !important;
+          }
         }
       `}</style>
     </div>
