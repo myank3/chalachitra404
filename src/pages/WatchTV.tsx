@@ -44,15 +44,18 @@ const PlayerFrame = memo(function PlayerFrame({
       allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
       allowFullScreen
       referrerPolicy="origin"
-      style={{ border: 0, width: '100%', height: '100%', contain: 'strict' }}
+      style={{
+        border: 0,
+        width: '100%',
+        height: '100%',
+        contain: 'content',
+      }}
     />
   );
 });
 
 /* ────────────────────────────────────────────────
-   Related fetch for TV:
-   TV has no collection concept in TMDB, so we
-   merge /recommendations + /similar.
+   Related fetch for TV
    ──────────────────────────────────────────────── */
 async function fetchRelatedTV(id: string): Promise<any[]> {
   const u = (path: string, extra = '') =>
@@ -87,7 +90,7 @@ async function fetchRelatedTV(id: string): Promise<any[]> {
 }
 
 /* ────────────────────────────────────────────────
-   Inline RelatedRow for TV shows
+   RelatedRow
    ──────────────────────────────────────────────── */
 const RelatedRow: React.FC<{
   title: string;
@@ -133,14 +136,14 @@ const RelatedRow: React.FC<{
         <button
           onClick={() => scroll('left')}
           aria-label="Scroll left"
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer touch-manipulation"
         >
           <ChevronRight className="w-5 h-5 rotate-180" strokeWidth={2} />
         </button>
         <button
           onClick={() => scroll('right')}
           aria-label="Scroll right"
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer touch-manipulation"
         >
           <ChevronRight className="w-5 h-5" strokeWidth={2} />
         </button>
@@ -159,9 +162,9 @@ const RelatedRow: React.FC<{
                 onClick={() => {
                   window.location.href = `/tv/${item.id}`;
                 }}
-                className="group/card block w-full text-left cursor-pointer"
+                className="group/card block w-full text-left cursor-pointer touch-manipulation"
               >
-                <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/[0.08] transition-[border-color,filter] duration-200 group-hover/card:brightness-125 group-hover/card:border-[rgba(124,92,255,0.45)]">
+                <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/[0.08] transition-[border-color,filter] duration-200 group-hover/card:brightness-125 group-active/card:brightness-125 group-hover/card:border-[rgba(124,92,255,0.45)]">
                   {item.poster_path ? (
                     <img
                       src={`https://image.tmdb.org/t/p/w342${item.poster_path}`}
@@ -237,7 +240,6 @@ export const WatchTV: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [markedWatched, setMarkedWatched] = useState(false);
 
-  const playerWrapperRef = useRef<HTMLDivElement>(null);
   const episodesRef = useRef<HTMLDivElement>(null);
   const scrollRafRef = useRef<number | null>(null);
 
@@ -457,7 +459,7 @@ export const WatchTV: React.FC = () => {
     .slice(0, 20);
 
   return (
-    <div className="min-h-screen text-[#f5f5f7] relative overflow-x-hidden bg-[#08080a]">
+    <div className="min-h-[100dvh] text-[#f5f5f7] relative overflow-x-hidden bg-[#08080a]">
       {/* LIGHT AMBIENT */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-[#0b0a14] via-[#08080a] to-[#050507]" />
@@ -485,21 +487,21 @@ export const WatchTV: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="group inline-flex items-center gap-2 text-sm text-[rgba(245,245,247,0.62)] hover:text-white transition-colors cursor-pointer"
+            className="group inline-flex items-center gap-2 py-2 pr-3 text-sm text-[rgba(245,245,247,0.62)] hover:text-white active:text-white transition-colors cursor-pointer touch-manipulation"
           >
             <ArrowLeft className="w-4 h-4 stroke-[1.5] transition-transform group-hover:-translate-x-0.5" />
             <span>Back</span>
           </button>
         </div>
 
-        {/* 2. Player */}
-        <div className={`${WIDTH_LADDER} animate-[playerIn_600ms_cubic-bezier(0.16,1,0.3,1)_both]`}>
+        {/* 2. Player — full-bleed on mobile, boxed on sm+ */}
+        <div className="-mx-4 sm:mx-auto sm:max-w-[624px] md:max-w-[844px] lg:max-w-[1044px] xl:max-w-[1184px] animate-[playerIn_600ms_cubic-bezier(0.16,1,0.3,1)_both]">
           <div
-            ref={playerWrapperRef}
             className="
               group relative w-full aspect-video
-              bg-black rounded-2xl overflow-hidden
-              border border-white/[0.08]
+              bg-black
+              border-y sm:border border-white/[0.08]
+              sm:rounded-2xl overflow-hidden
               shadow-[0_8px_40px_-8px_rgba(0,0,0,0.9)]
             "
           >
@@ -533,60 +535,7 @@ export const WatchTV: React.FC = () => {
                 )}
               </div>
             )}
-
-            {embedUrl && (
-              <button
-                type="button"
-                onClick={() => {
-                  const el = playerWrapperRef.current;
-                  if (!el) return;
-                  if (!document.fullscreenElement) {
-                    (el.requestFullscreen?.() ?? Promise.resolve()).then(() => {
-                      const o = (screen as any).orientation;
-                      if (o?.lock) o.lock('landscape').catch(() => {});
-                    }).catch(() => {});
-                  } else {
-                    const o = (screen as any).orientation;
-                    if (o?.unlock) o.unlock();
-                    document.exitFullscreen?.();
-                  }
-                }}
-                aria-label="Rotate / Fullscreen"
-                title="Rotate / Fullscreen"
-                className="
-                  absolute top-3 right-3 z-20
-                  inline-flex items-center justify-center
-                  w-10 h-10 sm:w-11 sm:h-11 rounded-xl
-                  bg-black/55 hover:bg-black/80
-                  backdrop-blur-md
-                  border border-white/15 hover:border-white/35
-                  text-white/85 hover:text-white
-                  transition-all duration-300
-                  hover:scale-105 active:scale-95
-                  opacity-100 sm:opacity-0 sm:group-hover:opacity-100
-                  focus:opacity-100
-                  cursor-pointer
-                "
-              >
-                <svg
-                  className="w-4 h-4 sm:w-5 sm:h-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                  <path d="M21 3v5h-5" />
-                </svg>
-              </button>
-            )}
           </div>
-
-          <p className="mt-2 text-[11px] text-[rgba(245,245,247,0.38)] text-center sm:hidden">
-            Tap rotate icon to go fullscreen
-          </p>
         </div>
 
         {/* 3. Server dropdown + S/E badge */}
@@ -610,7 +559,7 @@ export const WatchTV: React.FC = () => {
             <button
               type="button"
               onClick={scrollToEpisodes}
-              className="group inline-flex items-center gap-1.5 text-xs text-[rgba(245,245,247,0.55)] hover:text-white transition-colors cursor-pointer"
+              className="group inline-flex items-center gap-1.5 py-1.5 -my-1.5 text-xs text-[rgba(245,245,247,0.55)] hover:text-white active:text-white transition-colors cursor-pointer touch-manipulation"
             >
               <span>Episodes</span>
               <ChevronDown className="w-3.5 h-3.5 transition-transform group-hover:translate-y-0.5" />
@@ -641,7 +590,7 @@ export const WatchTV: React.FC = () => {
                   value={currentSeason}
                   onChange={(e) => handleSeasonChange(Number(e.target.value))}
                   aria-label="Select Season"
-                  className="appearance-none bg-[#111113] border border-white/[0.12] rounded-lg px-4 py-2 pr-9 text-sm text-white font-medium cursor-pointer hover:border-white/25 focus:outline-none focus:border-white/40 transition-colors"
+                  className="appearance-none bg-[#111113] border border-white/[0.12] rounded-lg px-4 py-2.5 pr-9 text-sm text-white font-medium cursor-pointer hover:border-white/25 focus:outline-none focus:border-white/40 transition-colors touch-manipulation"
                 >
                   {availableSeasons.map((s) => (
                     <option key={s.id} value={s.season_number} className="bg-[#111113] text-white">
@@ -672,10 +621,10 @@ export const WatchTV: React.FC = () => {
                   <div
                     key={ep.id}
                     onClick={() => handleEpisodeSelect(ep.episode_number)}
-                    className={`group relative rounded-xl p-3 border transition-colors duration-200 cursor-pointer flex gap-3.5 ${
+                    className={`group relative rounded-xl p-3 border transition-all duration-200 cursor-pointer flex gap-3.5 active:scale-[0.99] touch-manipulation ${
                       isCurrent
                         ? 'bg-[#17171a] border-white/[0.1] border-l-4 border-l-[#7c5cff]'
-                        : 'bg-[#111113] border-white/[0.08] hover:bg-white/[0.04] hover:border-white/[0.14]'
+                        : 'bg-[#111113] border-white/[0.08] hover:bg-white/[0.04] hover:border-white/[0.14] active:bg-white/[0.04]'
                     }`}
                   >
                     <div className="relative w-32 aspect-video shrink-0 rounded-lg overflow-hidden bg-black/60 border border-white/[0.06]">
@@ -684,7 +633,7 @@ export const WatchTV: React.FC = () => {
                           src={getImageUrl(ep.still_path, 'w500')}
                           alt={ep.name}
                           loading="lazy"
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 group-active:scale-105"
                           referrerPolicy="no-referrer"
                         />
                       ) : (
@@ -697,10 +646,10 @@ export const WatchTV: React.FC = () => {
                         className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
                           isCurrent
                             ? 'bg-black/40 opacity-100'
-                            : 'bg-black/40 opacity-0 group-hover:opacity-100'
+                            : 'bg-black/40 opacity-0 group-hover:opacity-100 group-active:opacity-100'
                         }`}
                       >
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center bg-white text-black">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-black">
                           <Play className="w-3.5 h-3.5 fill-current stroke-[1.5] ml-0.5" />
                         </div>
                       </div>
@@ -778,7 +727,7 @@ export const WatchTV: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-[rgba(245,245,247,0.75)] hover:text-white transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.08] border border-white/[0.08] text-xs text-[rgba(245,245,247,0.75)] hover:text-white active:text-white transition-all duration-200 cursor-pointer touch-manipulation"
                 >
                   {copied ? (
                     <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[1.5]" />
@@ -791,10 +740,10 @@ export const WatchTV: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleToggleWatchlist}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-all duration-200 hover:-translate-y-0.5 cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs transition-all duration-200 cursor-pointer touch-manipulation ${
                     inWatchlist
-                      ? 'bg-white text-black border-white font-medium hover:bg-[#e8e8ea]'
-                      : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-[rgba(245,245,247,0.75)] hover:text-white'
+                      ? 'bg-white text-black border-white font-medium hover:bg-[#e8e8ea] active:bg-[#e8e8ea]'
+                      : 'bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.08] border-white/[0.08] text-[rgba(245,245,247,0.75)] hover:text-white active:text-white'
                   }`}
                 >
                   <Bookmark className={`w-3.5 h-3.5 stroke-[1.5] ${inWatchlist ? 'fill-current' : ''}`} />
@@ -804,10 +753,10 @@ export const WatchTV: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleMarkWatched}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-all duration-200 hover:-translate-y-0.5 cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs transition-all duration-200 cursor-pointer touch-manipulation ${
                     markedWatched
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-medium'
-                      : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-[rgba(245,245,247,0.75)] hover:text-white'
+                      : 'bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.08] border-white/[0.08] text-[rgba(245,245,247,0.75)] hover:text-white active:text-white'
                   }`}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5 stroke-[1.5]" />

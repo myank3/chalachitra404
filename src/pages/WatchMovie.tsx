@@ -6,8 +6,6 @@ import {
   Bookmark,
   Check,
   CheckCircle2,
-  RotateCw,
-  Minimize2,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
@@ -45,17 +43,13 @@ const PlayerFrame = memo(function PlayerFrame({
       allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
       allowFullScreen
       referrerPolicy="origin"
-      style={{ border: 0, width: '100%', height: '100%', contain: 'strict' }}
+      style={{ border: 0, width: '100%', height: '100%', contain: 'content' }}
     />
   );
 });
 
 /* ────────────────────────────────────────────────
-   Related fetch for MOVIES:
-   1. If the movie belongs to a collection → fetch
-      /collection/{id} and return the other parts
-      (Spider-Man 1 → 2 → 3 works here).
-   2. Otherwise → merge /recommendations + /similar.
+   Related fetch for MOVIES
    ──────────────────────────────────────────────── */
 async function fetchRelatedMovie(
   movieId: string,
@@ -64,7 +58,6 @@ async function fetchRelatedMovie(
   const u = (path: string, extra = '') =>
     `${TMDB_BASE_URL}${path}?api_key=${TMDB_API_KEY}&language=en-US${extra}`;
 
-  // 1. Try collection (sequels / franchise parts)
   if (collectionId) {
     try {
       const res = await fetch(u(`/collection/${collectionId}`));
@@ -86,7 +79,6 @@ async function fetchRelatedMovie(
     }
   }
 
-  // 2. Fallback — merge recommendations + similar
   try {
     const [recRes, simRes] = await Promise.allSettled([
       fetch(u(`/movie/${movieId}/recommendations`, '&page=1')),
@@ -154,14 +146,14 @@ const RelatedRow: React.FC<{
         <button
           onClick={() => scroll('left')}
           aria-label="Scroll left"
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer touch-manipulation"
         >
           <ChevronRight className="w-5 h-5 rotate-180" strokeWidth={2} />
         </button>
         <button
           onClick={() => scroll('right')}
           aria-label="Scroll right"
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/70 backdrop-blur border border-white/[0.12] text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 hover:bg-black/90 transition-all duration-200 cursor-pointer touch-manipulation"
         >
           <ChevronRight className="w-5 h-5" strokeWidth={2} />
         </button>
@@ -180,9 +172,9 @@ const RelatedRow: React.FC<{
                 onClick={() => {
                   window.location.href = `/movie/${item.id}`;
                 }}
-                className="group/card block w-full text-left cursor-pointer"
+                className="group/card block w-full text-left cursor-pointer touch-manipulation"
               >
-                <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/[0.08] transition-[border-color,filter] duration-200 group-hover/card:brightness-125 group-hover/card:border-[rgba(124,92,255,0.45)]">
+                <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/[0.08] transition-[border-color,filter] duration-200 group-hover/card:brightness-125 group-active/card:brightness-125 group-hover/card:border-[rgba(124,92,255,0.45)]">
                   {item.poster_path ? (
                     <img
                       src={`https://image.tmdb.org/t/p/w342${item.poster_path}`}
@@ -240,9 +232,7 @@ export const WatchMovie: React.FC = () => {
 
   const [copied, setCopied] = useState(false);
   const [markedWatched, setMarkedWatched] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const playerWrapperRef = useRef<HTMLDivElement>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
   const scrollRafRef = useRef<number | null>(null);
 
@@ -271,7 +261,6 @@ export const WatchMovie: React.FC = () => {
     }
   };
 
-  /* Related — collection first, then similar */
   const collectionId = (movie as any)?.belongs_to_collection?.id as number | undefined;
 
   const { data: relatedData } = useQuery({
@@ -334,54 +323,6 @@ export const WatchMovie: React.FC = () => {
         cancelAnimationFrame(scrollRafRef.current);
         scrollRafRef.current = null;
       }
-    };
-  }, []);
-
-  const enterFullscreen = async () => {
-    const el = playerWrapperRef.current;
-    if (!el) return;
-    try {
-      if (!document.fullscreenElement) {
-        if (el.requestFullscreen) await el.requestFullscreen();
-        else if ((el as any).webkitRequestFullscreen) await (el as any).webkitRequestFullscreen();
-        setIsFullscreen(true);
-      }
-      const orientation = (screen as any).orientation;
-      if (orientation?.lock) {
-        try { await orientation.lock('landscape'); } catch {}
-      }
-    } catch {}
-  };
-
-  const exitFullscreen = async () => {
-    try {
-      const orientation = (screen as any).orientation;
-      if (orientation?.unlock) {
-        try { orientation.unlock(); } catch {}
-      }
-      if (document.fullscreenElement) await document.exitFullscreen();
-      setIsFullscreen(false);
-    } catch {}
-  };
-
-  const handleRotateToggle = () => (isFullscreen ? exitFullscreen() : enterFullscreen());
-
-  useEffect(() => {
-    const onFsChange = () => {
-      const active = !!document.fullscreenElement;
-      setIsFullscreen(active);
-      if (!active) {
-        const orientation = (screen as any).orientation;
-        if (orientation?.unlock) {
-          try { orientation.unlock(); } catch {}
-        }
-      }
-    };
-    document.addEventListener('fullscreenchange', onFsChange);
-    document.addEventListener('webkitfullscreenchange', onFsChange as any);
-    return () => {
-      document.removeEventListener('fullscreenchange', onFsChange);
-      document.removeEventListener('webkitfullscreenchange', onFsChange as any);
     };
   }, []);
 
@@ -464,7 +405,7 @@ export const WatchMovie: React.FC = () => {
   const inWatchlist = movie ? isInWatchlist(movie.id, 'movie') : false;
 
   return (
-    <div className="min-h-screen text-[#f5f5f7] relative overflow-x-hidden bg-[#08080a]">
+    <div className="min-h-[100dvh] text-[#f5f5f7] relative overflow-x-hidden bg-[#08080a]">
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-[#0b0a14] via-[#08080a] to-[#050507]" />
         <div
@@ -485,21 +426,28 @@ export const WatchMovie: React.FC = () => {
       </div>
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        {/* 1. Back */}
         <div className="mb-4 animate-[fadeSlideDown_400ms_ease-out_both]">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="group inline-flex items-center gap-2 text-sm text-[rgba(245,245,247,0.62)] hover:text-white transition-colors cursor-pointer"
+            className="group inline-flex items-center gap-2 py-2 pr-3 text-sm text-[rgba(245,245,247,0.62)] hover:text-white active:text-white transition-colors cursor-pointer touch-manipulation"
           >
             <ArrowLeft className="w-4 h-4 stroke-[1.5] transition-transform group-hover:-translate-x-0.5" />
             <span>Back</span>
           </button>
         </div>
 
-        <div className={`${WIDTH_LADDER} animate-[playerIn_600ms_cubic-bezier(0.16,1,0.3,1)_both]`}>
+        {/* 2. Player — full-bleed on mobile, boxed on sm+ */}
+        <div className="-mx-4 sm:mx-auto sm:max-w-[624px] md:max-w-[844px] lg:max-w-[1044px] xl:max-w-[1184px] animate-[playerIn_600ms_cubic-bezier(0.16,1,0.3,1)_both]">
           <div
-            ref={playerWrapperRef}
-            className="group relative w-full aspect-video bg-black rounded-2xl overflow-hidden border border-white/[0.08] shadow-[0_8px_40px_-8px_rgba(0,0,0,0.9)]"
+            className="
+              group relative w-full aspect-video
+              bg-black
+              border-y sm:border border-white/[0.08]
+              sm:rounded-2xl overflow-hidden
+              shadow-[0_8px_40px_-8px_rgba(0,0,0,0.9)]
+            "
           >
             <div
               aria-hidden
@@ -519,49 +467,38 @@ export const WatchMovie: React.FC = () => {
                 {imdbLoading || movieLoading ? (
                   <>
                     <Mascot state="loading" size={36} />
-                    <span>Loading stream…</span>
+                    <span className="animate-[pulseSoft_1.6s_ease-in-out_infinite]">
+                      Loading stream…
+                    </span>
                   </>
                 ) : (
                   <span>No video source found for this title.</span>
                 )}
               </div>
             )}
+          </div>
+        </div>
 
-            {embedUrl && (
-              <button
-                type="button"
-                onClick={handleRotateToggle}
-                aria-label={isFullscreen ? 'Exit fullscreen' : 'Rotate / Fullscreen'}
-                className="absolute top-3 right-3 z-20 inline-flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-black/55 hover:bg-black/80 backdrop-blur-md border border-white/15 hover:border-white/35 text-white/85 hover:text-white transition-all duration-300 cursor-pointer"
-              >
-                {isFullscreen ? <Minimize2 className="w-4 h-4 sm:w-5 sm:h-5" /> : <RotateCw className="w-4 h-4 sm:w-5 sm:h-5" />}
-              </button>
-            )}
+        {/* 3. Source + Scroll to details */}
+        <div className={`${WIDTH_LADDER} mt-5 flex flex-wrap items-center justify-between gap-3`}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)] shrink-0">
+              Source:
+            </span>
+            <ServerDropdown value={selectedProviderId} onChange={handleProviderSelect} />
           </div>
 
-          <p className="mt-2 text-[11px] text-[rgba(245,245,247,0.38)] text-center sm:hidden">
-            Tap <RotateCw className="inline w-3 h-3 -mt-0.5" /> to rotate &amp; go fullscreen
-          </p>
-        </div>
-
-        <div className={`${WIDTH_LADDER} mt-5 flex flex-wrap items-center gap-3`}>
-          <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(245,245,247,0.38)] shrink-0">
-            Source:
-          </span>
-          <ServerDropdown value={selectedProviderId} onChange={handleProviderSelect} />
-        </div>
-
-        <div className={`${WIDTH_LADDER} mt-3 flex justify-end`}>
           <button
             type="button"
             onClick={scrollToDetails}
-            className="group inline-flex items-center gap-1.5 text-xs text-[rgba(245,245,247,0.55)] hover:text-white transition-colors cursor-pointer"
+            className="group inline-flex items-center gap-1.5 py-1.5 -my-1.5 text-xs text-[rgba(245,245,247,0.55)] hover:text-white active:text-white transition-colors cursor-pointer touch-manipulation"
           >
             <span>Scroll for details</span>
             <ChevronDown className="w-3.5 h-3.5 transition-transform group-hover:translate-y-0.5" />
           </button>
         </div>
 
+        {/* 4. Info */}
         {movie && (
           <div ref={detailsRef} className={`${WIDTH_LADDER} mt-8 scroll-mt-4`}>
             <div className="max-w-[820px] space-y-4">
@@ -600,7 +537,7 @@ export const WatchMovie: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-[rgba(245,245,247,0.75)] hover:text-white transition-all duration-200 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.08] border border-white/[0.08] text-xs text-[rgba(245,245,247,0.75)] hover:text-white active:text-white transition-all duration-200 cursor-pointer touch-manipulation"
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[1.5]" /> : <Share2 className="w-3.5 h-3.5 stroke-[1.5]" />}
                   <span>{copied ? 'Copied' : 'Share'}</span>
@@ -609,10 +546,10 @@ export const WatchMovie: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleToggleWatchlist}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-all duration-200 cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs transition-all duration-200 cursor-pointer touch-manipulation ${
                     inWatchlist
-                      ? 'bg-white text-black border-white font-medium'
-                      : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-[rgba(245,245,247,0.75)] hover:text-white'
+                      ? 'bg-white text-black border-white font-medium hover:bg-[#e8e8ea] active:bg-[#e8e8ea]'
+                      : 'bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.08] border-white/[0.08] text-[rgba(245,245,247,0.75)] hover:text-white active:text-white'
                   }`}
                 >
                   <Bookmark className={`w-3.5 h-3.5 stroke-[1.5] ${inWatchlist ? 'fill-current' : ''}`} />
@@ -622,10 +559,10 @@ export const WatchMovie: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleMarkWatched}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-all duration-200 cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs transition-all duration-200 cursor-pointer touch-manipulation ${
                     markedWatched
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-medium'
-                      : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-[rgba(245,245,247,0.75)] hover:text-white'
+                      : 'bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.08] border-white/[0.08] text-[rgba(245,245,247,0.75)] hover:text-white active:text-white'
                   }`}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5 stroke-[1.5]" />
@@ -636,6 +573,7 @@ export const WatchMovie: React.FC = () => {
           </div>
         )}
 
+        {/* 5. Related */}
         {movie && relatedItems.length > 0 && (
           <div className="mt-14">
             <RelatedRow
@@ -663,10 +601,6 @@ export const WatchMovie: React.FC = () => {
         @keyframes shimmer {
           from { background-position: 0% 50%; }
           to   { background-position: 200% 50%; }
-        }
-        @keyframes softPulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.0); }
-          50%      { box-shadow: 0 0 0 6px rgba(255,255,255,0.06); }
         }
         @keyframes pulseSoft {
           0%, 100% { opacity: 0.55; }
