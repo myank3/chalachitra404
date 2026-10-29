@@ -59,7 +59,27 @@ export const MovieCard: React.FC<MovieCardProps> = React.memo(
       navigate(`/${item.media_type}/${item.id}`);
     };
 
-    const handleCardClick = () => goToDetails();
+    const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+      const isTouch = window.matchMedia('(hover: none)').matches;
+
+      if (isTouch) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const current = useHoverPreview.getState().item;
+        const sameCard =
+          current?.id != null && String(current.id) === String(item.id);
+
+        if (sameCard) {
+          // Second tap on the same card → navigate
+          goToDetails();
+        } else {
+          // First tap → show the floating preview (same as PC hover)
+          showPreview(item, rect);
+        }
+        return;
+      }
+
+      goToDetails();
+    };
 
     const handlePlay = (e: React.MouseEvent) => {
       e.stopPropagation();

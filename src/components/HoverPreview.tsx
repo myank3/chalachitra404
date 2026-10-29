@@ -41,6 +41,8 @@ export const HoverPreview: React.FC = () => {
   const [visible, setVisible] = useState(false);
   const [coords, setCoords] = useState({ left: 0, top: 0 });
   const [side, setSide] = useState<Side>('right');
+  const [effectiveW, setEffectiveW] = useState(PREVIEW_W);
+  const [isTouch, setIsTouch] = useState(false);
 
   const showTimerRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -48,6 +50,17 @@ export const HoverPreview: React.FC = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const scrollRafRef = useRef<number | null>(null);
   const isScrollingRef = useRef(false);
+
+  /* ---------- Touch detection + viewport clamp ---------- */
+  useEffect(() => {
+    const update = () => {
+      setEffectiveW(Math.min(PREVIEW_W, window.innerWidth - EDGE_PAD * 2));
+      setIsTouch(window.matchMedia('(hover: none)').matches);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   /* ---------- Details query — only when the preview is visible ---------- */
   const { data: details } = useQuery({
@@ -103,8 +116,8 @@ export const HoverPreview: React.FC = () => {
       postCmd('playVideo');
       postCmd('unMute');
       postCmd('setVolume', [100]);
-       postCmd('unloadModule', ['captions']); // ← this kills captions
-  postCmd('unloadModule', ['cc']);  
+      postCmd('unloadModule', ['captions']);
+      postCmd('unloadModule', ['cc']);
     };
 
     fire();
@@ -164,7 +177,7 @@ export const HoverPreview: React.FC = () => {
     const spaceRight  = vw - anchorRect.right;
 
     const needV = PREVIEW_H + GAP + EDGE_PAD;
-    const needH = PREVIEW_W + GAP + EDGE_PAD;
+    const needH = effectiveW + GAP + EDGE_PAD;
 
     const fitsTop    = spaceTop    >= needV;
     const fitsBottom = spaceBottom >= needV;
@@ -206,14 +219,14 @@ export const HoverPreview: React.FC = () => {
     switch (chosenSide) {
       case 'top':
         top = anchorRect.top - PREVIEW_H - GAP;
-        left = cardCenterX - PREVIEW_W / 2;
+        left = cardCenterX - effectiveW / 2;
         break;
       case 'bottom':
         top = anchorRect.bottom + GAP;
-        left = cardCenterX - PREVIEW_W / 2;
+        left = cardCenterX - effectiveW / 2;
         break;
       case 'left':
-        left = anchorRect.left - PREVIEW_W - GAP;
+        left = anchorRect.left - effectiveW - GAP;
         top = cardCenterY - PREVIEW_H / 2;
         break;
       case 'right':
@@ -223,13 +236,13 @@ export const HoverPreview: React.FC = () => {
     }
 
     if (left < EDGE_PAD) left = EDGE_PAD;
-    if (left + PREVIEW_W > vw - EDGE_PAD) left = vw - PREVIEW_W - EDGE_PAD;
+    if (left + effectiveW > vw - EDGE_PAD) left = vw - effectiveW - EDGE_PAD;
     if (top < EDGE_PAD) top = EDGE_PAD;
     if (top + PREVIEW_H > vh - EDGE_PAD) top = vh - PREVIEW_H - EDGE_PAD;
 
     setSide(chosenSide);
     setCoords({ left, top });
-  }, [anchorRect, visible]);
+  }, [anchorRect, visible, effectiveW]);
 
   /* ---------- Hover-out (rAF-throttled) ---------- */
   useEffect(() => {
@@ -284,6 +297,46 @@ export const HoverPreview: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [visible, hide]);
 
+  /* ---------- Touch: tap outside preview → dismiss ---------- */
+  useEffect(() => {
+    if (!isTouch || !visible) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const popup = popupRef.current;
+      if (popup?.contains(e.target as Node)) return;
+
+      if (anchorRect) {
+        const x = e.clientX;
+        const y = e.clientY;
+        if (
+          x >= anchorRect.left &&
+          x <= anchorRect.right &&
+          y >= anchorRect.top &&
+          y <= anchorRect.bottom
+        ) {
+          return;
+        }
+      }
+
+      hide();
+    };
+
+    document.addEventListener('pointerdown', onPointerDown, { capture: true });
+    return () =>
+      document.removeEventListener('pointerdown', onPointerDown, {
+        capture: true,
+      });
+  }, [isTouch, visible, hide, anchorRect]);
+
+  /* ---------- Touch: scrolling dismisses the preview ---------- */
+  useEffect(() => {
+    if (!isTouch || !visible) return;
+
+    const onScroll = () => hide();
+    window.addEventListener('scroll', onScroll, { passive: true, once: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [isTouch, visible, hide]);
+
   if (!item) return null;
 
   const title = item.title || (item as any).name || 'Untitled';
@@ -291,8 +344,10 @@ export const HoverPreview: React.FC = () => {
   const image = getImageUrl(item.backdrop_path || item.poster_path, 'w780');
   const isTV = item.media_type === 'tv';
 
-  const matchPct = 70 + ((item.id * 7) % 30);
-  const maturity = ['U/A 13+', 'U/A 16+', 'A', 'U/A 7+'][item.id % 4];
+  // Numeric id guard — item.id can arrive as a string from some API paths
+  const numericId = Number(item.id) || 0;
+  const matchPct = 70 + ((numericId * 7) % 30);
+  const maturity = ['U/A 13+', 'U/A 16+', 'A', 'U/A 7+'][numericId % 4];
 
   const genreNames = (details?.genres ?? [])
     .slice(0, 3)
@@ -344,7 +399,7 @@ export const HoverPreview: React.FC = () => {
             position: 'fixed',
             left: coords.left,
             top: coords.top,
-            width: PREVIEW_W,
+            width: effectiveW,
             height: PREVIEW_H,
             zIndex: 9999,
             transformOrigin: transformOriginBySide[side],
