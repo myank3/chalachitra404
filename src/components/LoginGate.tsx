@@ -1,16 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
-
-const PARTICLES = Array.from({ length: 22 }, (_, i) => {
-  const seed = i * 137.5;
-  return {
-    left: `${(seed * 3.7) % 100}%`,
-    delay: `${(seed * 0.13) % 18}s`,
-    duration: `${14 + ((seed * 0.7) % 10)}s`,
-    size: 1 + (i % 3),
-    opacity: 0.15 + ((seed % 20) / 100),
-  };
-});
+import { Loader2 } from 'lucide-react';
 
 export function LoginGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<'checking' | 'in' | 'out'>('checking');
@@ -18,6 +7,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   const [showKey, setShowKey] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -29,6 +19,14 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (state === 'out') inputRef.current?.focus();
   }, [state]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,117 +68,129 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen bg-[#08080a] text-[#f5f5f7] flex items-center justify-center p-4 overflow-hidden">
       {/* ═══════════════════════════════════════════
-          ANIMATED BACKDROP — this is what the
-          glass card's backdrop-filter blurs.
-          It MUST keep moving so the glass feels alive.
+          SVG FILTER — the Rorschach inkblot engine
+          ═══════════════════════════════════════════ */}
+      <svg aria-hidden className="pointer-events-none absolute w-0 h-0" focusable="false">
+        <defs>
+          <filter id="inkblot" x="-20%" y="-20%" width="140%" height="140%">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.007"
+              numOctaves="2"
+              seed="3"
+              result="noise"
+            >
+              {!reducedMotion && (
+                <animate
+                  attributeName="baseFrequency"
+                  dur="32s"
+                  values="0.007;0.012;0.007"
+                  repeatCount="indefinite"
+                  calcMode="spline"
+                  keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
+                />
+              )}
+            </feTurbulence>
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="noise"
+              scale="180"
+              xChannelSelector="R"
+              yChannelSelector="G"
+            >
+              {!reducedMotion && (
+                <animate
+                  attributeName="scale"
+                  dur="22s"
+                  values="150;220;150"
+                  repeatCount="indefinite"
+                  calcMode="spline"
+                  keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
+                />
+              )}
+            </feDisplacementMap>
+          </filter>
+        </defs>
+      </svg>
+
+      {/* ═══════════════════════════════════════════
+          BACKDROP — the color layer is filtered
           ═══════════════════════════════════════════ */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0b0a14] via-[#08080a] to-[#050507]" />
+        <div className="absolute inset-0 bg-[#08080a]" />
 
-        {/* Hue-shifting wrapper — makes the whole palette breathe */}
-        <div className="absolute inset-0 animate-[hueShift_40s_ease-in-out_infinite]">
-          {/* Rotating conic spotlight */}
+        <div className="absolute inset-0 will-change-[filter]" style={{ filter: 'url(#inkblot)' }}>
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0b0a14] via-[#08080a] to-[#050507]" />
+
+          {/* Orb 1 — violet */}
           <div
-            className="absolute left-1/2 top-1/2 w-[1400px] h-[1400px] -translate-x-1/2 -translate-y-1/2 opacity-[0.15] animate-[spinSlow_80s_linear_infinite]"
+            className="absolute w-[700px] h-[700px] rounded-full"
             style={{
+              top: '-15%',
+              left: '-12%',
               background:
-                'conic-gradient(from 0deg, transparent 0deg, rgba(124,92,255,0.9) 40deg, transparent 80deg, transparent 180deg, rgba(255,107,157,0.8) 220deg, transparent 260deg, transparent 360deg)',
-              filter: 'blur(60px)',
+                'radial-gradient(circle, rgba(124,92,255,0.9) 0%, rgba(124,92,255,0.4) 35%, rgba(124,92,255,0) 70%)',
+              filter: 'blur(40px)',
             }}
           />
-
-          {/* Orb 1 — purple */}
-          <div
-            className="absolute w-[560px] h-[560px] rounded-full opacity-55 animate-[drift1_24s_ease-in-out_infinite]"
-            style={{
-              top: '-14%',
-              left: '-10%',
-              background:
-                'radial-gradient(circle, rgba(124,92,255,0.65) 0%, rgba(124,92,255,0) 70%)',
-              filter: 'blur(70px)',
-            }}
-          />
-
           {/* Orb 2 — pink */}
           <div
-            className="absolute w-[600px] h-[600px] rounded-full opacity-50 animate-[drift2_28s_ease-in-out_infinite]"
+            className="absolute w-[700px] h-[700px] rounded-full"
             style={{
-              bottom: '-16%',
-              right: '-12%',
+              bottom: '-18%',
+              right: '-14%',
               background:
-                'radial-gradient(circle, rgba(255,107,157,0.6) 0%, rgba(255,107,157,0) 70%)',
-              filter: 'blur(80px)',
+                'radial-gradient(circle, rgba(255,107,157,0.85) 0%, rgba(255,107,157,0.35) 35%, rgba(255,107,157,0) 70%)',
+              filter: 'blur(40px)',
             }}
           />
-
           {/* Orb 3 — teal */}
           <div
-            className="absolute w-[420px] h-[420px] rounded-full opacity-35 animate-[drift3_32s_ease-in-out_infinite]"
+            className="absolute w-[550px] h-[550px] rounded-full"
             style={{
-              top: '38%',
-              left: '58%',
+              top: '30%',
+              left: '55%',
               background:
-                'radial-gradient(circle, rgba(94,234,212,0.55) 0%, rgba(94,234,212,0) 70%)',
-              filter: 'blur(90px)',
+                'radial-gradient(circle, rgba(94,234,212,0.7) 0%, rgba(94,234,212,0.25) 35%, rgba(94,234,212,0) 70%)',
+              filter: 'blur(50px)',
             }}
           />
-
-          {/* Orb 4 — deep violet */}
+          {/* Orb 4 — deep purple */}
           <div
-            className="absolute w-[480px] h-[480px] rounded-full opacity-45 animate-[drift4_26s_ease-in-out_infinite]"
+            className="absolute w-[600px] h-[600px] rounded-full"
             style={{
-              bottom: '8%',
-              left: '8%',
+              bottom: '5%',
+              left: '5%',
               background:
-                'radial-gradient(circle, rgba(90,50,200,0.6) 0%, rgba(90,50,200,0) 70%)',
-              filter: 'blur(75px)',
+                'radial-gradient(circle, rgba(90,50,200,0.85) 0%, rgba(90,50,200,0.3) 35%, rgba(90,50,200,0) 70%)',
+              filter: 'blur(45px)',
             }}
           />
-
           {/* Orb 5 — magenta */}
           <div
-            className="absolute w-[360px] h-[360px] rounded-full opacity-40 animate-[drift5_30s_ease-in-out_infinite]"
+            className="absolute w-[500px] h-[500px] rounded-full"
             style={{
-              top: '10%',
-              right: '6%',
+              top: '12%',
+              right: '8%',
               background:
-                'radial-gradient(circle, rgba(214,58,140,0.55) 0%, rgba(214,58,140,0) 70%)',
-              filter: 'blur(85px)',
+                'radial-gradient(circle, rgba(214,58,140,0.8) 0%, rgba(214,58,140,0.3) 35%, rgba(214,58,140,0) 70%)',
+              filter: 'blur(50px)',
             }}
           />
         </div>
-
-        {/* Floating particles */}
-        {PARTICLES.map((p, i) => (
-          <span
-            key={i}
-            className="absolute rounded-full bg-white animate-[floatUp_var(--dur)_linear_infinite]"
-            style={
-              {
-                left: p.left,
-                bottom: '-10px',
-                width: `${p.size}px`,
-                height: `${p.size}px`,
-                opacity: p.opacity,
-                animationDelay: p.delay,
-                '--dur': p.duration,
-              } as React.CSSProperties
-            }
-          />
-        ))}
 
         {/* Vignette */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              'radial-gradient(120% 90% at 50% 30%, transparent 35%, rgba(0,0,0,0.7) 100%)',
+              'radial-gradient(120% 90% at 50% 30%, transparent 30%, rgba(0,0,0,0.85) 100%)',
           }}
         />
 
         {/* Grain */}
         <div
-          className="absolute inset-0 opacity-[0.035] mix-blend-overlay"
+          className="absolute inset-0 opacity-[0.04] mix-blend-overlay"
           style={{
             backgroundImage:
               "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>\")",
@@ -189,70 +199,82 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* ═══════════════════════════════════════════
-          GLASS CARD — now the moving blur really
-          shows through because the fill is nearly
-          transparent and the backdrop-filter is dense.
+          CARD
           ═══════════════════════════════════════════ */}
-      <div className="relative w-full max-w-sm animate-[gateIn_700ms_cubic-bezier(0.16,1,0.3,1)_both]">
-        {/* Brand block */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] mb-5 backdrop-blur-md">
-            <span className="w-1 h-1 rounded-full bg-[#5eead4] animate-[pulseSoft_2s_ease-in-out_infinite]" />
-            <span className="text-[9px] font-medium uppercase tracking-[0.18em] text-white/55">
-              Private Lounge
+      <div className="relative w-full max-w-sm animate-[gateIn_800ms_cubic-bezier(0.16,1,0.3,1)_both]">
+        {/* Monogram */}
+        <div className="flex justify-center mb-8">
+          <div className="relative w-20 h-20 flex items-center justify-center">
+            <svg viewBox="0 0 80 80" className="absolute inset-0 w-full h-full">
+              <defs>
+                <linearGradient id="monoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#c9b8ff" />
+                  <stop offset="50%" stopColor="#b8a4ff" />
+                  <stop offset="100%" stopColor="#ff6b9d" />
+                </linearGradient>
+              </defs>
+              <circle cx="40" cy="40" r="38" fill="none" stroke="url(#monoGrad)" strokeWidth="0.75" opacity="0.5" />
+              <circle cx="40" cy="40" r="33" fill="none" stroke="url(#monoGrad)" strokeWidth="0.5" opacity="0.25" />
+              <circle cx="40" cy="4" r="1" fill="url(#monoGrad)" opacity="0.7" />
+              <circle cx="40" cy="76" r="1" fill="url(#monoGrad)" opacity="0.7" />
+            </svg>
+            <span
+              className="text-[34px] leading-none bg-gradient-to-b from-white via-white/90 to-white/40 bg-clip-text text-transparent"
+              style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 500 }}
+            >
+              C
             </span>
           </div>
-
-          <div className="relative inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#7c5cff]/15 border border-[#7c5cff]/40 mb-5 shadow-[0_0_60px_-8px_rgba(124,92,255,0.8)]">
-            <KeyRound className="w-7 h-7 text-[#b8a4ff]" />
-            <div className="absolute inset-0 rounded-2xl bg-[#7c5cff]/25 blur-2xl -z-10 animate-[pulseSoft_3.5s_ease-in-out_infinite]" />
-          </div>
-
-          <h1 className="text-[26px] font-semibold tracking-[-0.025em] bg-gradient-to-b from-white via-white/90 to-white/50 bg-clip-text text-transparent">
-            Chalachitra
-          </h1>
-          <p className="text-[11px] text-white/40 mt-2 tracking-wide">
-            Members only — enter your access key
-          </p>
         </div>
 
-        {/* Glass form card */}
+        {/* Wordmark */}
+        <h1
+          className="text-center text-[40px] leading-none bg-gradient-to-b from-white via-white/95 to-white/40 bg-clip-text text-transparent"
+          style={{
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontWeight: 500,
+            letterSpacing: '0.02em',
+          }}
+        >
+          Chalachitra
+        </h1>
+
+        {/* Ornamental divider */}
+        <div className="flex items-center justify-center gap-3 mt-4 mb-3">
+          <span className="h-px w-12 bg-gradient-to-r from-transparent to-white/30" />
+          <span className="w-1 h-1 rotate-45 bg-white/40" />
+          <span className="h-px w-12 bg-gradient-to-l from-transparent to-white/30" />
+        </div>
+
+        {/* Sub-tagline */}
+        <p className="text-center text-[9.5px] uppercase tracking-[0.35em] text-white/40 mb-10">
+          Private Access
+        </p>
+
+        {/* Form */}
         <form
           onSubmit={submit}
           className="relative overflow-hidden rounded-2xl
-                     bg-white/[0.015]
+                     bg-black/30
                      backdrop-blur-[40px] backdrop-saturate-150
-                     border border-white/[0.10]
-                     p-6
+                     border border-white/[0.09]
+                     p-7
                      shadow-[0_30px_80px_-20px_rgba(0,0,0,0.95),inset_0_1px_0_0_rgba(255,255,255,0.08)]
-                     space-y-4"
+                     space-y-5"
         >
-          {/* Refraction sweep — light rotating inside the glass */}
           <div
             aria-hidden
-            className="pointer-events-none absolute -inset-1/2 opacity-40 animate-[spinSlow_60s_linear_infinite]"
-            style={{
-              background:
-                'conic-gradient(from 90deg at 50% 50%, transparent 0deg, rgba(124,92,255,0.22) 60deg, transparent 120deg, transparent 240deg, rgba(255,107,157,0.18) 300deg, transparent 360deg)',
-              filter: 'blur(40px)',
-            }}
+            className="pointer-events-none absolute top-0 left-8 right-8 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"
           />
 
-          {/* Top sheen line */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
-          />
-
-          <div className="relative">
+          <div>
             <label
               htmlFor="access-key"
-              className="block text-[10px] font-medium uppercase tracking-[0.15em] text-white/45 mb-2"
+              className="block text-[9.5px] font-medium uppercase tracking-[0.3em] text-white/45 mb-3"
             >
               Access Key
             </label>
             <div className="relative">
-              <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
               <input
                 ref={inputRef}
                 id="access-key"
@@ -265,23 +287,29 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
                 placeholder="••••••••••••"
                 autoComplete="off"
                 spellCheck={false}
-                className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-black/30 border border-white/[0.10] text-sm text-white placeholder-white/20 font-mono tracking-wider focus:outline-none focus:border-[#7c5cff]/60 focus:ring-2 focus:ring-[#7c5cff]/25 transition-all"
+                className="w-full px-4 py-3 pr-16 rounded-lg
+                           bg-white/[0.03] border border-white/[0.09]
+                           text-[15px] text-white text-center
+                           placeholder-white/20
+                           font-mono tracking-[0.3em]
+                           focus:outline-none focus:border-[#7c5cff]/60 focus:bg-white/[0.04]
+                           focus:ring-1 focus:ring-[#7c5cff]/20
+                           transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowKey((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2
+                           text-[8.5px] uppercase tracking-[0.15em] font-medium
+                           text-white/35 hover:text-white/70 transition-colors cursor-pointer
+                           px-1.5 py-1"
                 aria-label={showKey ? 'Hide access key' : 'Show access key'}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white/70 transition-colors cursor-pointer"
               >
-                {showKey ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
+                {showKey ? 'Hide' : 'Show'}
               </button>
             </div>
             {err && (
-              <p className="mt-2 text-[11px] text-red-400 animate-[shake_300ms_ease-out]">
+              <p className="mt-2.5 text-[10.5px] tracking-wider text-red-400/90 text-center animate-[shake_300ms_ease-out]">
                 {err}
               </p>
             )}
@@ -290,12 +318,21 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           <button
             type="submit"
             disabled={busy || !key}
-            className="relative w-full py-2.5 rounded-xl bg-gradient-to-b from-[#8f72ff] to-[#7c5cff] text-white text-sm font-semibold hover:from-[#9d84ff] hover:to-[#8a6cff] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-[0_8px_28px_-6px_rgba(124,92,255,0.8),inset_0_1px_0_0_rgba(255,255,255,0.25)] cursor-pointer"
+            className="relative w-full py-3 rounded-lg
+                       bg-gradient-to-b from-white/[0.06] to-white/[0.02]
+                       border border-white/[0.12]
+                       text-[10.5px] uppercase tracking-[0.3em] font-medium text-white/90
+                       hover:from-[#8f72ff]/30 hover:to-[#7c5cff]/20 hover:border-[#8f72ff]/50 hover:text-white
+                       active:scale-[0.99]
+                       disabled:opacity-40 disabled:cursor-not-allowed
+                       transition-all
+                       flex items-center justify-center gap-2
+                       cursor-pointer"
           >
             {busy ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Verifying…</span>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Verifying</span>
               </>
             ) : (
               <span>Unlock</span>
@@ -303,63 +340,28 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           </button>
         </form>
 
-        <p className="text-center text-[10px] text-white/25 mt-6 tracking-wide">
-          Restricted access · Chalachitra
-        </p>
+        {/* Footer */}
+        <div className="text-center mt-8">
+          <p className="text-[8.5px] uppercase tracking-[0.3em] text-white/25">
+            By Invitation Only
+          </p>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <span className="w-1 h-1 rounded-full bg-white/15" />
+            <span className="w-1 h-1 rounded-full bg-white/15" />
+            <span className="w-1 h-1 rounded-full bg-white/15" />
+          </div>
+        </div>
       </div>
 
       <style>{`
         @keyframes gateIn {
-          from { opacity: 0; transform: translateY(14px) scale(0.97); filter: blur(8px); }
+          from { opacity: 0; transform: translateY(16px) scale(0.97); filter: blur(10px); }
           to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
         }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
           25%      { transform: translateX(-4px); }
           75%      { transform: translateX(4px); }
-        }
-        @keyframes spinSlow {
-          from { transform: translate(-50%, -50%) rotate(0deg); }
-          to   { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-        @keyframes hueShift {
-          0%, 100% { filter: hue-rotate(0deg); }
-          50%      { filter: hue-rotate(25deg); }
-        }
-        @keyframes drift1 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33%      { transform: translate(70px, 50px) scale(1.15); }
-          66%      { transform: translate(-40px, 90px) scale(0.9); }
-        }
-        @keyframes drift2 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33%      { transform: translate(-80px, -60px) scale(1.12); }
-          66%      { transform: translate(50px, -100px) scale(0.92); }
-        }
-        @keyframes drift3 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50%      { transform: translate(-90px, 70px) scale(1.25); }
-        }
-        @keyframes drift4 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50%      { transform: translate(80px, -80px) scale(0.85); }
-        }
-        @keyframes drift5 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50%      { transform: translate(-60px, 90px) scale(1.18); }
-        }
-        @keyframes floatUp {
-          0%   { transform: translateY(0) translateX(0); opacity: 0; }
-          10%  { opacity: 1; }
-          90%  { opacity: 1; }
-          100% { transform: translateY(-105vh) translateX(20px); opacity: 0; }
-        }
-        @keyframes pulseSoft {
-          0%, 100% { opacity: 0.4; }
-          50%      { opacity: 0.85; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          [class*="animate-["] { animation: none !important; }
         }
       `}</style>
     </div>
