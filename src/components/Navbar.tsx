@@ -1,13 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  Search,
-  Home as HomeIcon,
-  Film,
-  Tv as TvIcon,
-  LayoutGrid,
-  Sparkles,
-  Bookmark,
-} from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUIStore, NavTab } from '../stores/useUIStore';
 
@@ -32,19 +24,6 @@ const NAV_LINKS: NavLink[] = [
   { id: 'genres', label: 'GENRES' },
   { id: 'recommend', label: 'FOR YOU' },
 ];
-
-/* Icons used only by the mobile bottom tab bar */
-const BOTTOM_NAV_ICONS: Record<
-  NavTab,
-  React.ComponentType<{ className?: string; strokeWidth?: number }>
-> = {
-  home: HomeIcon,
-  movies: Film,
-  tv: TvIcon,
-  genres: LayoutGrid,
-  recommend: Sparkles,
-  watchlist: Bookmark,
-};
 
 /* ---------- Scramble text (desktop pill nav) ---------- */
 const ScrambleText: React.FC<{ text: string }> = ({ text }) => {
@@ -132,74 +111,91 @@ const Logo: React.FC = () => (
   </svg>
 );
 
-/* ---------- Bottom tab bar — mobile only, floats 0.5cm above bottom ---------- */
+/* ---------- Bottom tab bar — same pill look as desktop, flush at bottom ---------- */
 const MobileBottomNav: React.FC<{
   activeTab: NavTab;
+  activeIndex: number;
   onNavigate: (id: NavTab) => void;
-}> = ({ activeTab, onNavigate }) => (
-  <nav
-    aria-label="Primary"
-    className="md:hidden fixed left-3 right-3 z-40"
-    style={{ bottom: 'calc(0.5cm + env(safe-area-inset-bottom))' }}
-  >
-    {/* soft fade above the floating bar */}
+}> = ({ activeTab, activeIndex, onNavigate }) => {
+  const navRef = useRef<HTMLDivElement>(null);
+  const linkRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [pill, setPill] = useState({ left: 0, width: 0, ready: false });
+
+  /* Sliding pill — same behavior as the desktop nav */
+  useEffect(() => {
+    const el = linkRefs.current[activeIndex];
+    const nav = navRef.current;
+    if (!el || !nav) return;
+
+    const raf = requestAnimationFrame(() => {
+      const elRect = el.getBoundingClientRect();
+      const navRect = nav.getBoundingClientRect();
+      setPill({
+        left: elRect.left - navRect.left,
+        width: elRect.width,
+        ready: true,
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [activeIndex]);
+
+  return (
     <div
-      aria-hidden
-      className="absolute -top-6 left-0 right-0 h-6 pointer-events-none"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.08]"
       style={{
-        background:
-          'linear-gradient(to top, rgba(10,10,11,0.9), rgba(10,10,11,0))',
-      }}
-    />
-    <div
-      className="relative rounded-2xl border border-white/[0.08] bg-[#0a0a0b]/95 overflow-hidden shadow-[0_8px_28px_rgba(0,0,0,0.55)]"
-      style={{
+        background: 'rgba(10,10,11,0.92)',
         backdropFilter: 'blur(20px) saturate(180%)',
         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <div className="flex items-stretch justify-around px-1">
-        {NAV_LINKS.map((link) => {
+      <nav
+        ref={navRef}
+        aria-label="Primary"
+        className="relative flex items-center h-14 px-2"
+      >
+        {pill.ready && (
+          <span
+            aria-hidden
+            className="absolute top-1.5 bottom-1.5 rounded-full pointer-events-none"
+            style={{
+              left: pill.left + 2,
+              width: pill.width - 4,
+              background:
+                'linear-gradient(135deg, rgba(124,92,255,0.28), rgba(255,107,157,0.18))',
+              border: '1px solid rgba(124,92,255,0.4)',
+              boxShadow:
+                '0 0 20px rgba(124,92,255,0.35), inset 0 0 12px rgba(124,92,255,0.15)',
+              transition:
+                'left 420ms cubic-bezier(0.34,1.56,0.64,1), width 420ms cubic-bezier(0.34,1.56,0.64,1)',
+            }}
+          />
+        )}
+
+        {NAV_LINKS.map((link, i) => {
           const isActive = activeTab === link.id;
-          const Icon = BOTTOM_NAV_ICONS[link.id];
           return (
             <button
               key={link.id}
+              ref={(el) => {
+                linkRefs.current[i] = el;
+              }}
               type="button"
               onClick={() => onNavigate(link.id)}
               aria-current={isActive ? 'page' : undefined}
-              className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 px-1 cursor-pointer touch-manipulation select-none"
+              className="relative flex-1 flex items-center justify-center h-full px-1 text-[10px] font-semibold tracking-[0.08em] transition-colors duration-200 cursor-pointer touch-manipulation select-none z-10"
+              style={{
+                color: isActive ? '#ffffff' : 'rgba(245,245,247,0.5)',
+              }}
             >
-              {isActive && (
-                <span
-                  aria-hidden
-                  className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-7 rounded-full"
-                  style={{
-                    background: 'linear-gradient(90deg, #7c5cff, #ff6b9d)',
-                    boxShadow: '0 0 10px rgba(124,92,255,0.7)',
-                  }}
-                />
-              )}
-              <Icon
-                className={`w-[18px] h-[18px] transition-colors ${
-                  isActive ? 'text-white' : 'text-[rgba(245,245,247,0.55)]'
-                }`}
-                strokeWidth={isActive ? 2.2 : 1.8}
-              />
-              <span
-                className={`text-[9px] font-semibold tracking-[0.1em] transition-colors ${
-                  isActive ? 'text-white' : 'text-[rgba(245,245,247,0.5)]'
-                }`}
-              >
-                {link.label}
-              </span>
+              {link.label}
             </button>
           );
         })}
-      </div>
+      </nav>
     </div>
-  </nav>
-);
+  );
+};
 
 /* ---------- Navbar ---------- */
 export const Navbar: React.FC = () => {
@@ -340,7 +336,7 @@ export const Navbar: React.FC = () => {
             'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
         }}
       >
-        {/* Ambient aurora blobs (desktop hover effect) */}
+        {/* Ambient aurora blobs */}
         <div
           aria-hidden
           className="nc-ambient pointer-events-none absolute inset-0 overflow-hidden"
@@ -488,7 +484,7 @@ export const Navbar: React.FC = () => {
             })}
           </nav>
 
-          {/* RIGHT — Clock + Search (hamburger removed; bottom bar replaces it) */}
+          {/* RIGHT — Clock + Search */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0 z-10">
             <span className="hidden lg:flex items-center gap-1.5 text-[10px] font-mono tracking-wider text-[rgba(245,245,247,0.4)]">
               <span className="w-1 h-1 rounded-full bg-[#5eead4] animate-pulse" />
@@ -536,8 +532,12 @@ export const Navbar: React.FC = () => {
         </div>
       </header>
 
-      {/* Mobile bottom tab bar — replaces the hamburger dropdown */}
-      <MobileBottomNav activeTab={activeTab} onNavigate={handleNavClick} />
+      {/* Mobile bottom pill nav — same visual language as desktop, flush to bottom */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        activeIndex={activeIndex}
+        onNavigate={handleNavClick}
+      />
 
       <style>{`
         @keyframes ncPillShimmer {
