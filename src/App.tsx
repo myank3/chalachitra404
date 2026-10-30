@@ -104,8 +104,7 @@ function HistoryRecorder() {
 
 function AppLayout() {
   return (
-    <div className="relative min-h-screen bg-[#0a0a0b] text-[#f5f5f7] antialiased selection:bg-[#7c5cff]/30 selection:text-white flex flex-col pb-[calc(5rem+0.5cm+env(safe-area-inset-bottom))] md:pb-0">
-      <AmbientBackground />
+  <div className="relative min-h-screen bg-[#0a0a0b] text-[#f5f5f7] antialiased selection:bg-[#7c5cff]/30 selection:text-white flex flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] md:pb-0">     <AmbientBackground />
       <Onboarding />
       <Navbar />
 

@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+} from 'react';
 import { Search } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUIStore, NavTab } from '../stores/useUIStore';
@@ -25,10 +31,14 @@ const NAV_LINKS: NavLink[] = [
   { id: 'recommend', label: 'FOR YOU' },
 ];
 
-/* ---------- Scramble text (desktop pill nav) ---------- */
-const ScrambleText: React.FC<{ text: string }> = ({ text }) => {
+/* ---------- Scramble text ---------- */
+const ScrambleText: React.FC<{ text: string; active?: boolean }> = ({
+  text,
+  active,
+}) => {
   const [display, setDisplay] = useState(text);
   const intervalRef = useRef<number | null>(null);
+  const prevActiveRef = useRef<boolean | undefined>(active);
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
   const scramble = useCallback(() => {
@@ -55,6 +65,14 @@ const ScrambleText: React.FC<{ text: string }> = ({ text }) => {
     }, 28);
   }, [text]);
 
+  /* Mobile: scramble when this tab becomes the active one (skip initial mount) */
+  useEffect(() => {
+    if (active === true && prevActiveRef.current !== true) {
+      scramble();
+    }
+    prevActiveRef.current = active;
+  }, [active, scramble]);
+
   useEffect(
     () => () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
@@ -69,7 +87,7 @@ const ScrambleText: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-/* ---------- Logo (unchanged) ---------- */
+/* ---------- Logo ---------- */
 const Logo: React.FC = () => (
   <svg
     width="32"
@@ -111,7 +129,7 @@ const Logo: React.FC = () => (
   </svg>
 );
 
-/* ---------- Bottom tab bar — same pill look as desktop, flush at bottom ---------- */
+/* ---------- Mobile bottom nav — glass pill, ambience, 144Hz-safe ---------- */
 const MobileBottomNav: React.FC<{
   activeTab: NavTab;
   activeIndex: number;
@@ -121,78 +139,124 @@ const MobileBottomNav: React.FC<{
   const linkRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [pill, setPill] = useState({ left: 0, width: 0, ready: false });
 
-  /* Sliding pill — same behavior as the desktop nav */
-  useEffect(() => {
+  const measure = useCallback(() => {
     const el = linkRefs.current[activeIndex];
     const nav = navRef.current;
     if (!el || !nav) return;
-
-    const raf = requestAnimationFrame(() => {
-      const elRect = el.getBoundingClientRect();
-      const navRect = nav.getBoundingClientRect();
-      setPill({
-        left: elRect.left - navRect.left,
-        width: elRect.width,
-        ready: true,
-      });
+    const elRect = el.getBoundingClientRect();
+    const navRect = nav.getBoundingClientRect();
+    /* Skip if hidden (desktop) or mid-layout */
+    if (elRect.width === 0 || navRect.width === 0) return;
+    setPill({
+      left: elRect.left - navRect.left,
+      width: elRect.width,
+      ready: true,
     });
-    return () => cancelAnimationFrame(raf);
   }, [activeIndex]);
 
-  return (
-    <div
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.08]"
-      style={{
-        background: 'rgba(10,10,11,0.92)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
-    >
-      <nav
-        ref={navRef}
-        aria-label="Primary"
-        className="relative flex items-center h-14 px-2"
-      >
-        {pill.ready && (
-          <span
-            aria-hidden
-            className="absolute top-1.5 bottom-1.5 rounded-full pointer-events-none"
-            style={{
-              left: pill.left + 2,
-              width: pill.width - 4,
-              background:
-                'linear-gradient(135deg, rgba(124,92,255,0.28), rgba(255,107,157,0.18))',
-              border: '1px solid rgba(124,92,255,0.4)',
-              boxShadow:
-                '0 0 20px rgba(124,92,255,0.35), inset 0 0 12px rgba(124,92,255,0.15)',
-              transition:
-                'left 420ms cubic-bezier(0.34,1.56,0.64,1), width 420ms cubic-bezier(0.34,1.56,0.64,1)',
-            }}
-          />
-        )}
+  /* Initial measure before paint (no flash) */
+  useLayoutEffect(() => {
+    measure();
+  }, [measure]);
 
-        {NAV_LINKS.map((link, i) => {
-          const isActive = activeTab === link.id;
-          return (
-            <button
-              key={link.id}
-              ref={(el) => {
-                linkRefs.current[i] = el;
-              }}
-              type="button"
-              onClick={() => onNavigate(link.id)}
-              aria-current={isActive ? 'page' : undefined}
-              className="relative flex-1 flex items-center justify-center h-full px-1 text-[10px] font-semibold tracking-[0.08em] transition-colors duration-200 cursor-pointer touch-manipulation select-none z-10"
+  /* Re-measure on resize, rotate, orientation change */
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    let raf = 0;
+    const schedule = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        measure();
+      });
+    };
+    const ro = new ResizeObserver(schedule);
+    ro.observe(nav);
+    window.addEventListener('orientationchange', schedule);
+    window.addEventListener('resize', schedule);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('orientationchange', schedule);
+      window.removeEventListener('resize', schedule);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [measure]);
+
+  return (
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40">
+      {/* Fade above bar — content melts into it */}
+      <div
+        aria-hidden
+        className="absolute -top-8 left-0 right-0 h-8 pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(to top, rgba(10,10,11,0.9), rgba(10,10,11,0))',
+        }}
+      />
+
+      {/* Glass bar */}
+      <div
+        className="relative border-t border-white/[0.08] overflow-hidden"
+        style={{
+          background: 'rgba(10,10,11,0.92)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
+      >
+        {/* Aurora blobs — GPU-composited drift */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none overflow-hidden"
+        >
+          <span className="nc-mobile-blob nc-mobile-blob-a" />
+          <span className="nc-mobile-blob nc-mobile-blob-b" />
+        </div>
+
+        <nav
+          ref={navRef}
+          aria-label="Primary"
+          className="relative flex items-center h-14 px-2"
+        >
+          {/* Shimmer sweep — GPU-composited */}
+          <span className="nc-mobile-shimmer" aria-hidden>
+            <span className="nc-mobile-shimmer__sweep" />
+          </span>
+
+          {/* Sliding pill — same visual language as desktop */}
+          {pill.ready && (
+            <span
+              aria-hidden
+              className="nc-mobile-pill"
               style={{
-                color: isActive ? '#ffffff' : 'rgba(245,245,247,0.5)',
+                transform: `translate3d(${pill.left + 2}px, 0, 0)`,
+                width: pill.width - 4,
               }}
-            >
-              {link.label}
-            </button>
-          );
-        })}
-      </nav>
+            />
+          )}
+
+          {NAV_LINKS.map((link, i) => {
+            const isActive = activeTab === link.id;
+            return (
+              <button
+                key={link.id}
+                ref={(el) => {
+                  linkRefs.current[i] = el;
+                }}
+                type="button"
+                onClick={() => onNavigate(link.id)}
+                aria-current={isActive ? 'page' : undefined}
+                className="relative flex-1 flex items-center justify-center h-full px-1 text-[10px] font-semibold tracking-[0.1em] transition-colors duration-200 cursor-pointer touch-manipulation select-none z-10"
+                style={{
+                  color: isActive ? '#ffffff' : 'rgba(245,245,247,0.55)',
+                }}
+              >
+                <ScrambleText text={link.label} active={isActive} />
+                {isActive && <span className="nc-mobile-dot" aria-hidden />}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
     </div>
   );
 };
@@ -301,7 +365,7 @@ export const Navbar: React.FC = () => {
     return () => cancelAnimationFrame(raf);
   }, [hoveredIndex, activeIndex]);
 
-  /* Nav click — same behavior for top pill and bottom bar */
+  /* Nav click */
   const handleNavClick = useCallback(
     (id: NavTab) => {
       const target = ROUTES[id];
@@ -376,7 +440,7 @@ export const Navbar: React.FC = () => {
         </div>
 
         <div className="relative h-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          {/* LEFT — Logo + wordmark */}
+          {/* LEFT — Logo */}
           <button
             onClick={() => handleNavClick('home')}
             aria-label="Home"
@@ -532,7 +596,7 @@ export const Navbar: React.FC = () => {
         </div>
       </header>
 
-      {/* Mobile bottom pill nav — same visual language as desktop, flush to bottom */}
+      {/* Mobile bottom nav */}
       <MobileBottomNav
         activeTab={activeTab}
         activeIndex={activeIndex}
@@ -540,6 +604,7 @@ export const Navbar: React.FC = () => {
       />
 
       <style>{`
+        /* ---------- Shared (desktop) ---------- */
         @keyframes ncPillShimmer {
           0%   { background-position: 200% 0; }
           50%  { background-position: 0% 0; }
@@ -579,16 +644,132 @@ export const Navbar: React.FC = () => {
           animation: ncBlobBreathe 7s ease-in-out infinite;
         }
 
+        /* ---------- Mobile bottom nav ---------- */
+
+        /* Aurora blobs — transform-only drift (GPU) */
+        .nc-mobile-blob {
+          position: absolute;
+          bottom: -60%;
+          width: 240px;
+          height: 240px;
+          border-radius: 50%;
+          filter: blur(40px);
+          pointer-events: none;
+          will-change: transform;
+          transform: translateZ(0);
+        }
+        .nc-mobile-blob-a {
+          left: 5%;
+          background: radial-gradient(
+            circle,
+            rgba(124,92,255,0.55) 0%,
+            rgba(124,92,255,0) 65%
+          );
+          animation: ncMobileBlobA 18s ease-in-out infinite;
+        }
+        .nc-mobile-blob-b {
+          right: 5%;
+          background: radial-gradient(
+            circle,
+            rgba(255,107,157,0.42) 0%,
+            rgba(255,107,157,0) 65%
+          );
+          animation: ncMobileBlobB 22s ease-in-out infinite;
+        }
+        @keyframes ncMobileBlobA {
+          0%, 100% { transform: translate3d(-15%, 0, 0); }
+          50%      { transform: translate3d(25%, 0, 0); }
+        }
+        @keyframes ncMobileBlobB {
+          0%, 100% { transform: translate3d(15%, 0, 0); }
+          50%      { transform: translate3d(-25%, 0, 0); }
+        }
+
+        /* Shimmer sweep — transform-only (GPU, no repaint) */
+        .nc-mobile-shimmer {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          overflow: hidden;
+          z-index: 0;
+        }
+        .nc-mobile-shimmer__sweep {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 0;
+          width: 200%;
+          background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(124,92,255,0.10) 25%,
+            rgba(255,107,157,0.08) 50%,
+            transparent 75%
+          );
+          animation: ncMobileShimmerSweep 9s ease-in-out infinite;
+          will-change: transform;
+          transform: translateZ(0);
+        }
+        @keyframes ncMobileShimmerSweep {
+          0%   { transform: translate3d(-50%, 0, 0); }
+          50%  { transform: translate3d(0, 0, 0); }
+          100% { transform: translate3d(-50%, 0, 0); }
+        }
+
+        /* Sliding pill — same look as desktop */
+        .nc-mobile-pill {
+          position: absolute;
+          top: 6px;
+          bottom: 6px;
+          left: 0;
+          border-radius: 9999px;
+          background: linear-gradient(
+            135deg,
+            rgba(124,92,255,0.32),
+            rgba(255,107,157,0.20)
+          );
+          border: 1px solid rgba(124,92,255,0.45);
+          box-shadow:
+            0 0 20px rgba(124,92,255,0.35),
+            inset 0 0 12px rgba(124,92,255,0.15);
+          transition:
+            transform 420ms cubic-bezier(0.34,1.56,0.64,1),
+            width 420ms cubic-bezier(0.34,1.56,0.64,1);
+          pointer-events: none;
+          z-index: 1;
+        }
+
+        /* Pulsing active dot — same animation as desktop */
+        .nc-mobile-dot {
+          position: absolute;
+          bottom: 10px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #7c5cff, #ff6b9d);
+          box-shadow: 0 0 8px rgba(124,92,255,0.9);
+          animation: ncDotPulse 2.4s ease-in-out infinite;
+          pointer-events: none;
+        }
+
+        /* ---------- Reduced motion ---------- */
         @media (prefers-reduced-motion: reduce) {
           .nc-logo .nc-lens,
           .nc-logo .nc-lens-core,
           .nc-active-dot,
           .nc-blob-a,
           .nc-blob-b,
-          .nc-pill-shimmer {
+          .nc-pill-shimmer,
+          .nc-mobile-blob-a,
+          .nc-mobile-blob-b,
+          .nc-mobile-shimmer__sweep,
+          .nc-mobile-dot {
             animation: none !important;
           }
           .nc-logo-wrap { filter: none !important; }
+          .nc-mobile-pill { transition: none !important; }
         }
       `}</style>
     </>
