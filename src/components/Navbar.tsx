@@ -5,7 +5,15 @@ import React, {
   useRef,
   useCallback,
 } from 'react';
-import { Search } from 'lucide-react';
+import {
+  Search,
+  Home as HomeIcon,
+  Film,
+  Tv as TvIcon,
+  LayoutGrid,
+  Sparkles,
+  Bookmark,
+} from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUIStore, NavTab } from '../stores/useUIStore';
 
@@ -30,6 +38,19 @@ const NAV_LINKS: NavLink[] = [
   { id: 'genres', label: 'GENRES' },
   { id: 'recommend', label: 'FOR YOU' },
 ];
+
+/* Icons used by the mobile bottom tab bar */
+const BOTTOM_NAV_ICONS: Record<
+  NavTab,
+  React.ComponentType<{ className?: string; strokeWidth?: number }>
+> = {
+  home: HomeIcon,
+  movies: Film,
+  tv: TvIcon,
+  genres: LayoutGrid,
+  recommend: Sparkles,
+  watchlist: Bookmark,
+};
 
 /* ---------- ScrambleText — desktop hover only ---------- */
 const ScrambleText: React.FC<{ text: string }> = ({ text }) => {
@@ -117,7 +138,7 @@ const Logo: React.FC = () => (
   </svg>
 );
 
-/* ---------- Mobile bottom nav — transparent bar, solid brand-gradient pill ---------- */
+/* ---------- Mobile bottom nav — transparent bar, glass pill inside icon ---------- */
 const MobileBottomNav: React.FC<{
   activeTab: NavTab;
   activeIndex: number;
@@ -167,63 +188,57 @@ const MobileBottomNav: React.FC<{
   }, [measure]);
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40">
-      <div
-        className="nc-mobile-bar relative"
-        style={{
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        }}
+    <div
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
+      <nav
+        ref={navRef}
+        aria-label="Primary"
+        className="relative flex items-center justify-evenly h-14 px-2"
       >
-        {/* Ultra-subtle hairline — barely-there structure */}
-        <span
-          aria-hidden
-          className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-          style={{
-            background:
-              'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.06) 70%, transparent 100%)',
-          }}
-        />
+        {/* Glass pill — the only element with backdrop-filter, sized to the icon */}
+        {pill.ready && (
+          <span
+            aria-hidden
+            className="nc-mobile-pill"
+            style={{
+              transform: `translate3d(${pill.left + 4}px, 0, 0)`,
+              width: pill.width - 8,
+            }}
+          />
+        )}
 
-        <nav
-          ref={navRef}
-          aria-label="Primary"
-          className="relative flex items-center h-14 px-2"
-        >
-          {pill.ready && (
-            <span
-              aria-hidden
-              className="nc-mobile-pill"
-              style={{
-                transform: `translate3d(${pill.left + 2}px, 0, 0)`,
-                width: pill.width - 4,
+        {NAV_LINKS.map((link, i) => {
+          const isActive = activeTab === link.id;
+          const Icon = BOTTOM_NAV_ICONS[link.id];
+          return (
+            <button
+              key={link.id}
+              ref={(el) => {
+                linkRefs.current[i] = el;
               }}
-            />
-          )}
-
-          {NAV_LINKS.map((link, i) => {
-            const isActive = activeTab === link.id;
-            return (
-              <button
-                key={link.id}
-                ref={(el) => {
-                  linkRefs.current[i] = el;
-                }}
-                type="button"
-                onClick={() => onNavigate(link.id)}
-                aria-current={isActive ? 'page' : undefined}
-                className="relative flex-1 flex items-center justify-center h-full px-1 text-[10px] font-semibold tracking-[0.1em] cursor-pointer touch-manipulation select-none z-10"
-                style={{
-                  color: '#ffffff',
-                  textShadow: isActive ? 'none' : '0 1px 3px rgba(0,0,0,0.85)',
-                  transition: 'color 120ms ease',
-                }}
-              >
-                {link.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+              type="button"
+              onClick={() => onNavigate(link.id)}
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={link.label}
+              className="relative flex items-center justify-center w-14 h-full z-10 cursor-pointer touch-manipulation select-none"
+              style={{
+                color: isActive ? '#ffffff' : 'rgba(255,255,255,0.78)',
+                filter: isActive
+                  ? 'none'
+                  : 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
+                transition: 'color 140ms ease',
+              }}
+            >
+              <Icon
+                className="w-[20px] h-[20px]"
+                strokeWidth={isActive ? 2.2 : 1.9}
+              />
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 };
@@ -563,7 +578,7 @@ export const Navbar: React.FC = () => {
         </div>
       </header>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom nav — transparent bar, icons only, glass pill inside icon */}
       <MobileBottomNav
         activeTab={activeTab}
         activeIndex={activeIndex}
@@ -611,29 +626,35 @@ export const Navbar: React.FC = () => {
           animation: ncBlobBreathe 7s ease-in-out infinite;
         }
 
-        /* ---------- Mobile bar — fully transparent ---------- */
-        .nc-mobile-bar {
-          background: transparent;
-        }
-
-        /* ---------- Mobile pill — solid brand gradient ---------- */
+        /* ---------- Mobile glass pill (inside icon) ---------- */
         .nc-mobile-pill {
           position: absolute;
-          top: 6px;
-          bottom: 6px;
+          top: 8px;
+          bottom: 8px;
           left: 0;
           border-radius: 9999px;
-          /* Brand gradient at full opacity — same colors as logo / active dot */
-          background: linear-gradient(135deg, #7c5cff 0%, #ff6b9d 100%);
+          background: rgba(255, 255, 255, 0.12);
+          backdrop-filter: blur(16px) saturate(160%);
+          -webkit-backdrop-filter: blur(16px) saturate(160%);
+          border: 1px solid rgba(255, 255, 255, 0.14);
           box-shadow:
-            0 0 20px rgba(124, 92, 255, 0.45),
-            0 2px 10px rgba(0, 0, 0, 0.4);
+            0 2px 10px rgba(0, 0, 0, 0.2),
+            inset 0 1px 0 rgba(255, 255, 255, 0.20);
           transition:
-            transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
-            width 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            transform 220ms cubic-bezier(0.4, 0, 0.2, 1),
+            width 220ms cubic-bezier(0.4, 0, 0.2, 1);
           pointer-events: none;
           z-index: 1;
           will-change: transform;
+        }
+
+        /* Fallback for browsers without backdrop-filter (old WebViews) */
+        @supports not (
+          (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+        ) {
+          .nc-mobile-pill {
+            background: rgba(40, 40, 50, 0.55);
+          }
         }
 
         /* ---------- Reduced motion ---------- */
