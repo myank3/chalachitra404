@@ -7,11 +7,11 @@ import React, {
 } from 'react';
 import {
   Search,
-  Home as HomeIcon,
+  House,
   Film,
-  Tv as TvIcon,
+  Tv,
   LayoutGrid,
-  Sparkles,
+  Network,
   Bookmark,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -39,16 +39,16 @@ const NAV_LINKS: NavLink[] = [
   { id: 'recommend', label: 'FOR YOU' },
 ];
 
-/* Icons used by the mobile bottom tab bar */
+/* Icons — classic premium set, last = neural network diagram */
 const BOTTOM_NAV_ICONS: Record<
   NavTab,
   React.ComponentType<{ className?: string; strokeWidth?: number }>
 > = {
-  home: HomeIcon,
+  home: House,
   movies: Film,
-  tv: TvIcon,
+  tv: Tv,
   genres: LayoutGrid,
-  recommend: Sparkles,
+  recommend: Network,
   watchlist: Bookmark,
 };
 
@@ -138,7 +138,7 @@ const Logo: React.FC = () => (
   </svg>
 );
 
-/* ---------- Mobile bottom nav — transparent bar, glass pill inside icon ---------- */
+/* ---------- Mobile bottom nav — solid black bar + hairline, gradient pill ---------- */
 const MobileBottomNav: React.FC<{
   activeTab: NavTab;
   activeIndex: number;
@@ -189,7 +189,7 @@ const MobileBottomNav: React.FC<{
 
   return (
     <div
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0a0b] border-t border-white/[0.08]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <nav
@@ -197,7 +197,7 @@ const MobileBottomNav: React.FC<{
         aria-label="Primary"
         className="relative flex items-center justify-evenly h-14 px-2"
       >
-        {/* Glass pill — the only element with backdrop-filter, sized to the icon */}
+        {/* Gradient pill behind active icon */}
         {pill.ready && (
           <span
             aria-hidden
@@ -224,12 +224,9 @@ const MobileBottomNav: React.FC<{
               aria-label={link.label}
               className="relative flex items-center justify-center w-14 h-full z-10 cursor-pointer touch-manipulation select-none"
               style={{
-  color: isActive ? '#ffffff' : '#a78bfa',
-  filter: isActive
-    ? 'none'
-    : 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
-  transition: 'color 140ms ease',
-}}
+                color: isActive ? '#ffffff' : 'rgba(255,255,255,0.70)',
+                transition: 'color 140ms ease',
+              }}
             >
               <Icon
                 className="w-[20px] h-[20px]"
@@ -578,7 +575,7 @@ export const Navbar: React.FC = () => {
         </div>
       </header>
 
-      {/* Mobile bottom nav — transparent bar, icons only, glass pill inside icon */}
+      {/* Mobile bottom nav — solid black bar + hairline, gradient pill */}
       <MobileBottomNav
         activeTab={activeTab}
         activeIndex={activeIndex}
@@ -626,35 +623,23 @@ export const Navbar: React.FC = () => {
           animation: ncBlobBreathe 7s ease-in-out infinite;
         }
 
-        /* ---------- Mobile glass pill (inside icon) ---------- */
+        /* ---------- Mobile pill — solid brand gradient ---------- */
         .nc-mobile-pill {
           position: absolute;
           top: 8px;
           bottom: 8px;
           left: 0;
           border-radius: 9999px;
-          background: rgba(255, 255, 255, 0.12);
-          backdrop-filter: blur(16px) saturate(160%);
-          -webkit-backdrop-filter: blur(16px) saturate(160%);
-          border: 1px solid rgba(255, 255, 255, 0.14);
+          background: linear-gradient(135deg, #7c5cff 0%, #ff6b9d 100%);
           box-shadow:
-            0 2px 10px rgba(0, 0, 0, 0.2),
-            inset 0 1px 0 rgba(255, 255, 255, 0.20);
+            0 0 20px rgba(124, 92, 255, 0.40),
+            0 2px 8px rgba(0, 0, 0, 0.35);
           transition:
             transform 220ms cubic-bezier(0.4, 0, 0.2, 1),
             width 220ms cubic-bezier(0.4, 0, 0.2, 1);
           pointer-events: none;
           z-index: 1;
           will-change: transform;
-        }
-
-        /* Fallback for browsers without backdrop-filter (old WebViews) */
-        @supports not (
-          (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
-        ) {
-          .nc-mobile-pill {
-            background: rgba(40, 40, 50, 0.55);
-          }
         }
 
         /* ---------- Reduced motion ---------- */
