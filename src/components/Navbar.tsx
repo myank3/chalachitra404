@@ -224,12 +224,12 @@ const MobileBottomNav: React.FC<{
               aria-label={link.label}
               className="relative flex items-center justify-center w-14 h-full z-10 cursor-pointer touch-manipulation select-none"
               style={{
-                color: isActive ? '#ffffff' : 'rgba(255,255,255,0.78)',
-                filter: isActive
-                  ? 'none'
-                  : 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
-                transition: 'color 140ms ease',
-              }}
+  color: isActive ? '#ffffff' : '#a78bfa',
+  filter: isActive
+    ? 'none'
+    : 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
+  transition: 'color 140ms ease',
+}}
             >
               <Icon
                 className="w-[20px] h-[20px]"
