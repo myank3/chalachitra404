@@ -117,7 +117,7 @@ const Logo: React.FC = () => (
   </svg>
 );
 
-/* ---------- Mobile bottom nav — transparent glass, working blur ---------- */
+/* ---------- Mobile bottom nav — transparent bar, solid brand-gradient pill ---------- */
 const MobileBottomNav: React.FC<{
   activeTab: NavTab;
   activeIndex: number;
@@ -168,24 +168,19 @@ const MobileBottomNav: React.FC<{
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40">
-      {/*
-        IMPORTANT: no `contain`, no `transform`, no `will-change` on this element.
-        Any of those creates its own backdrop-root and silently kills backdrop-filter
-        in Chromium/Android. The class .nc-mobile-bar handles the glass.
-      */}
       <div
         className="nc-mobile-bar relative"
         style={{
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
-        {/* Soft hairline highlight on top — the "glass edge catching light" */}
+        {/* Ultra-subtle hairline — barely-there structure */}
         <span
           aria-hidden
           className="absolute top-0 left-0 right-0 h-px pointer-events-none"
           style={{
             background:
-              'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.10) 30%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.10) 70%, transparent 100%)',
+              'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.06) 70%, transparent 100%)',
           }}
         />
 
@@ -218,7 +213,8 @@ const MobileBottomNav: React.FC<{
                 aria-current={isActive ? 'page' : undefined}
                 className="relative flex-1 flex items-center justify-center h-full px-1 text-[10px] font-semibold tracking-[0.1em] cursor-pointer touch-manipulation select-none z-10"
                 style={{
-                  color: isActive ? '#ffffff' : 'rgba(245,245,247,0.55)',
+                  color: '#ffffff',
+                  textShadow: isActive ? 'none' : '0 1px 3px rgba(0,0,0,0.85)',
                   transition: 'color 120ms ease',
                 }}
               >
@@ -615,36 +611,23 @@ export const Navbar: React.FC = () => {
           animation: ncBlobBreathe 7s ease-in-out infinite;
         }
 
-        /* ---------- Mobile glass bar ---------- */
-        /* Base: solid-ish fallback for browsers without backdrop-filter */
+        /* ---------- Mobile bar — fully transparent ---------- */
         .nc-mobile-bar {
-          background: rgba(18, 18, 24, 0.82);
-        }
-        /* Modern browsers: real glass */
-        @supports (
-          (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
-        ) {
-          .nc-mobile-bar {
-            background: rgba(18, 18, 24, 0.42);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-          }
+          background: transparent;
         }
 
-        /* ---------- Mobile sliding pill ---------- */
+        /* ---------- Mobile pill — solid brand gradient ---------- */
         .nc-mobile-pill {
           position: absolute;
           top: 6px;
           bottom: 6px;
           left: 0;
           border-radius: 9999px;
-          background: linear-gradient(
-            135deg,
-            rgba(124,92,255,0.26),
-            rgba(255,107,157,0.16)
-          );
-          border: 1px solid rgba(124,92,255,0.35);
-          box-shadow: inset 0 0 12px rgba(124,92,255,0.10);
+          /* Brand gradient at full opacity — same colors as logo / active dot */
+          background: linear-gradient(135deg, #7c5cff 0%, #ff6b9d 100%);
+          box-shadow:
+            0 0 20px rgba(124, 92, 255, 0.45),
+            0 2px 10px rgba(0, 0, 0, 0.4);
           transition:
             transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
             width 150ms cubic-bezier(0.4, 0, 0.2, 1);
