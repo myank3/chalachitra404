@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Menu, X } from 'lucide-react';
+import {
+  Search,
+  Home as HomeIcon,
+  Film,
+  Tv as TvIcon,
+  LayoutGrid,
+  Sparkles,
+  Bookmark,
+} from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUIStore, NavTab } from '../stores/useUIStore';
 
@@ -25,7 +33,20 @@ const NAV_LINKS: NavLink[] = [
   { id: 'recommend', label: 'FOR YOU' },
 ];
 
-/* ---------- Scramble text ---------- */
+/* Icons used only by the mobile bottom tab bar */
+const BOTTOM_NAV_ICONS: Record<
+  NavTab,
+  React.ComponentType<{ className?: string; strokeWidth?: number }>
+> = {
+  home: HomeIcon,
+  movies: Film,
+  tv: TvIcon,
+  genres: LayoutGrid,
+  recommend: Sparkles,
+  watchlist: Bookmark,
+};
+
+/* ---------- Scramble text (desktop pill nav) ---------- */
 const ScrambleText: React.FC<{ text: string }> = ({ text }) => {
   const [display, setDisplay] = useState(text);
   const intervalRef = useRef<number | null>(null);
@@ -69,7 +90,7 @@ const ScrambleText: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-/* ---------- Logo ---------- */
+/* ---------- Logo (unchanged) ---------- */
 const Logo: React.FC = () => (
   <svg
     width="32"
@@ -104,35 +125,80 @@ const Logo: React.FC = () => (
     <circle cx="28" cy="10" r="3.5" stroke="url(#logoGradient)" strokeWidth="1.5" fill="none" />
     <circle cx="28" cy="10" r="1.2" fill="url(#logoGradient)" />
 
-    <circle
-      cx="20"
-      cy="21"
-      r="7"
-      stroke="url(#lensGradient)"
-      strokeWidth="1.5"
-      fill="none"
-      filter="url(#logoGlow)"
-      className="nc-lens"
-    />
-    <circle
-      cx="20"
-      cy="21"
-      r="4"
-      stroke="url(#lensGradient)"
-      strokeWidth="1"
-      fill="none"
-      opacity="0.8"
-    />
-    <circle
-      cx="20"
-      cy="21"
-      r="1.6"
-      fill="#ffffff"
-      filter="url(#logoGlow)"
-      className="nc-lens-core"
-    />
+    <circle cx="20" cy="21" r="7" stroke="url(#lensGradient)" strokeWidth="1.5" fill="none" filter="url(#logoGlow)" className="nc-lens" />
+    <circle cx="20" cy="21" r="4" stroke="url(#lensGradient)" strokeWidth="1" fill="none" opacity="0.8" />
+    <circle cx="20" cy="21" r="1.6" fill="#ffffff" filter="url(#logoGlow)" className="nc-lens-core" />
     <path d="M 15.5 18 A 6 6 0 0 1 20 15" stroke="#ffffff" strokeWidth="1" strokeLinecap="round" fill="none" opacity="0.6" />
   </svg>
+);
+
+/* ---------- Bottom tab bar — mobile only, floats 0.5cm above bottom ---------- */
+const MobileBottomNav: React.FC<{
+  activeTab: NavTab;
+  onNavigate: (id: NavTab) => void;
+}> = ({ activeTab, onNavigate }) => (
+  <nav
+    aria-label="Primary"
+    className="md:hidden fixed left-3 right-3 z-40"
+    style={{ bottom: 'calc(0.5cm + env(safe-area-inset-bottom))' }}
+  >
+    {/* soft fade above the floating bar */}
+    <div
+      aria-hidden
+      className="absolute -top-6 left-0 right-0 h-6 pointer-events-none"
+      style={{
+        background:
+          'linear-gradient(to top, rgba(10,10,11,0.9), rgba(10,10,11,0))',
+      }}
+    />
+    <div
+      className="relative rounded-2xl border border-white/[0.08] bg-[#0a0a0b]/95 overflow-hidden shadow-[0_8px_28px_rgba(0,0,0,0.55)]"
+      style={{
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+      }}
+    >
+      <div className="flex items-stretch justify-around px-1">
+        {NAV_LINKS.map((link) => {
+          const isActive = activeTab === link.id;
+          const Icon = BOTTOM_NAV_ICONS[link.id];
+          return (
+            <button
+              key={link.id}
+              type="button"
+              onClick={() => onNavigate(link.id)}
+              aria-current={isActive ? 'page' : undefined}
+              className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 px-1 cursor-pointer touch-manipulation select-none"
+            >
+              {isActive && (
+                <span
+                  aria-hidden
+                  className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-7 rounded-full"
+                  style={{
+                    background: 'linear-gradient(90deg, #7c5cff, #ff6b9d)',
+                    boxShadow: '0 0 10px rgba(124,92,255,0.7)',
+                  }}
+                />
+              )}
+              <Icon
+                className={`w-[18px] h-[18px] transition-colors ${
+                  isActive ? 'text-white' : 'text-[rgba(245,245,247,0.55)]'
+                }`}
+                strokeWidth={isActive ? 2.2 : 1.8}
+              />
+              <span
+                className={`text-[9px] font-semibold tracking-[0.1em] transition-colors ${
+                  isActive ? 'text-white' : 'text-[rgba(245,245,247,0.5)]'
+                }`}
+              >
+                {link.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  </nav>
 );
 
 /* ---------- Navbar ---------- */
@@ -155,7 +221,6 @@ export const Navbar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [pill, setPill] = useState({ left: 0, width: 0, ready: false });
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [time, setTime] = useState('');
   const [mouseX, setMouseX] = useState(0.5);
 
@@ -203,7 +268,7 @@ export const Navbar: React.FC = () => {
     };
   }, []);
 
-  /* Mouse position */
+  /* Mouse position (desktop aurora blobs) */
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (mouseRafRef.current) return;
@@ -221,25 +286,7 @@ export const Navbar: React.FC = () => {
     };
   }, []);
 
-  /* Escape + body lock */
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMobileOpen(false);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [mobileOpen]);
-
-  /* Close mobile on route change */
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
-
-  /* Sliding pill */
+  /* Sliding pill (desktop) */
   useEffect(() => {
     const targetIndex = hoveredIndex !== null ? hoveredIndex : activeIndex;
     const el = linkRefs.current[targetIndex];
@@ -258,10 +305,9 @@ export const Navbar: React.FC = () => {
     return () => cancelAnimationFrame(raf);
   }, [hoveredIndex, activeIndex]);
 
-  /* Nav click — non-blocking */
+  /* Nav click — same behavior for top pill and bottom bar */
   const handleNavClick = useCallback(
     (id: NavTab) => {
-      setMobileOpen(false);
       const target = ROUTES[id];
       if (location.pathname === target) {
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -294,7 +340,7 @@ export const Navbar: React.FC = () => {
             'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
         }}
       >
-        {/* Ambient aurora blobs */}
+        {/* Ambient aurora blobs (desktop hover effect) */}
         <div
           aria-hidden
           className="nc-ambient pointer-events-none absolute inset-0 overflow-hidden"
@@ -351,12 +397,10 @@ export const Navbar: React.FC = () => {
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
               }}
-            >
-              
-            </span>
+            />
           </button>
 
-          {/* CENTER — Pill nav (MY LIST removed) */}
+          {/* CENTER — Pill nav (desktop only) */}
           <nav
             ref={navRef}
             onMouseLeave={() => setHoveredIndex(null)}
@@ -444,7 +488,7 @@ export const Navbar: React.FC = () => {
             })}
           </nav>
 
-          {/* RIGHT — Clock + Search + Menu */}
+          {/* RIGHT — Clock + Search (hamburger removed; bottom bar replaces it) */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0 z-10">
             <span className="hidden lg:flex items-center gap-1.5 text-[10px] font-mono tracking-wider text-[rgba(245,245,247,0.4)]">
               <span className="w-1 h-1 rounded-full bg-[#5eead4] animate-pulse" />
@@ -488,97 +532,12 @@ export const Navbar: React.FC = () => {
               />
               <Search className="relative w-3.5 h-3.5 stroke-[2] text-[rgba(245,245,247,0.7)] group-hover:text-[#7c5cff] transition-colors" />
             </button>
-
-            <button
-              onClick={() => setMobileOpen((v) => !v)}
-              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={mobileOpen}
-              className="md:hidden relative w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/[0.06] transition-colors cursor-pointer"
-            >
-              {mobileOpen ? (
-                <X className="w-4 h-4 text-[#f5f5f7]" strokeWidth={2} />
-              ) : (
-                <Menu className="w-4 h-4 text-[#f5f5f7]" strokeWidth={2} />
-              )}
-            </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile menu (MY LIST removed) */}
-      <div
-        className={`fixed inset-0 z-40 md:hidden transition-opacity duration-200 ${
-          mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        aria-hidden={!mobileOpen}
-      >
-        <div
-          className="absolute inset-0 bg-black/70"
-          style={{
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-          }}
-          onClick={() => setMobileOpen(false)}
-        />
-
-        <div
-          className={`absolute left-4 right-4 top-[68px] rounded-2xl border border-white/[0.08] overflow-hidden transition-all duration-300 ${
-            mobileOpen ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'
-          }`}
-          style={{
-            background: 'rgba(10,10,11,0.96)',
-            backdropFilter: 'blur(24px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-          }}
-        >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(60% 40% at 20% 0%, rgba(124,92,255,0.14) 0%, transparent 70%), radial-gradient(60% 40% at 80% 100%, rgba(255,107,157,0.10) 0%, transparent 70%)',
-            }}
-          />
-
-          <nav className="relative flex flex-col p-2">
-            {NAV_LINKS.map((link, i) => {
-              const isActive = activeTab === link.id;
-              return (
-                <button
-                  key={link.id}
-                  onClick={() => handleNavClick(link.id)}
-                  className={`relative text-left text-[13px] font-semibold tracking-[0.12em] py-3.5 px-4 rounded-xl flex items-center justify-between transition-all duration-200 cursor-pointer ${
-                    isActive
-                      ? 'text-[#f5f5f7] bg-white/[0.05]'
-                      : 'text-[rgba(245,245,247,0.6)] hover:text-[#f5f5f7] hover:bg-white/[0.03]'
-                  }`}
-                  style={{
-                    transitionDelay: mobileOpen ? `${i * 30}ms` : '0ms',
-                    opacity: mobileOpen ? 1 : 0,
-                    transform: mobileOpen ? 'translateY(0)' : 'translateY(6px)',
-                  }}
-                >
-                  <span>{link.label}</span>
-                  {isActive && (
-                    <span
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{
-                        background: 'linear-gradient(135deg, #7c5cff, #ff6b9d)',
-                        boxShadow: '0 0 8px rgba(124,92,255,0.9)',
-                      }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="relative px-4 py-3 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono tracking-wider text-[rgba(245,245,247,0.4)]">
-            <span>CHALACHITRA</span>
-            <span>{time} IST</span>
-          </div>
-        </div>
-      </div>
+      {/* Mobile bottom tab bar — replaces the hamburger dropdown */}
+      <MobileBottomNav activeTab={activeTab} onNavigate={handleNavClick} />
 
       <style>{`
         @keyframes ncPillShimmer {
